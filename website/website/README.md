@@ -23,13 +23,18 @@ Then open `http://localhost:3000`.
 
 ## Current design direction
 
-The first theme is an orange/black retail-electronics style inspired by strong local e-commerce layouts: warm, compact, practical, and less “AI SaaS”. The current homepage includes:
+The active direction is a dense orange/black retail-electronics storefront: compact header, category rail, editorial campaign panels, deal ribbon, product cards, trust badges, repair booking and a grounded Nairobi shop feel. It borrows the practical rhythm of strong local e-commerce sites while keeping Crystal Shop's own content and visual system.
+
+The current homepage includes:
 
 - campaign hero
+- category navigation rail
+- promo/deal ribbon
 - trust signals
 - featured product cards
 - category cards
 - repair booking call-to-action
+- testimonial/proof cards
 - footer links and contact placeholders
 
 ## Backend connection plan
