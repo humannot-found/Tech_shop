@@ -1,16 +1,18 @@
-const categoryRail = [
-  "Phones & Tablets",
+const navLinks = [
+  "Shop All",
   "Computers",
   "Audio",
   "Gaming",
   "Power & Networking",
-  "Accessories",
-  "Repairs",
+  "Lifestyle & Home",
+  "Contact",
 ];
+
+const utilityLinks = ["Account", "Wishlist", "Cart 0"];
 
 const heroCampaigns = [
   {
-    kicker: "Gaming · Volume 01",
+    kicker: "Gaming / Volume 01",
     title: "Built for serious play.",
     copy: "Console pads, headsets, screens and power backup picked for the way Nairobi actually games.",
     action: "Shop gaming",
@@ -18,7 +20,7 @@ const heroCampaigns = [
     art: "gamepad",
   },
   {
-    kicker: "Audio · Portable editions",
+    kicker: "Audio / Portable editions",
     title: "Sound that follows you.",
     copy: "Speakers, earbuds and party-ready audio with warranty-backed stock.",
     action: "Shop audio",
@@ -42,7 +44,7 @@ const featuredProducts = [
     category: "Phones & Tablets",
     price: "KES 27,500",
     oldPrice: "KES 29,000",
-    meta: "6GB RAM · 128GB ROM",
+    meta: "6GB RAM / 128GB ROM",
     art: "phone",
   },
   {
@@ -51,7 +53,7 @@ const featuredProducts = [
     category: "Computers",
     price: "KES 56,000",
     oldPrice: "KES 59,500",
-    meta: "Core i5 · 8GB · 256GB SSD",
+    meta: "Core i5 / 8GB / 256GB SSD",
     art: "laptop",
   },
   {
@@ -60,7 +62,7 @@ const featuredProducts = [
     category: "Audio",
     price: "KES 13,500",
     oldPrice: "KES 15,000",
-    meta: "Genuine stock · Warranty covered",
+    meta: "Genuine stock / Warranty covered",
     art: "speaker",
   },
   {
@@ -69,7 +71,7 @@ const featuredProducts = [
     category: "Power & Networking",
     price: "KES 3,800",
     oldPrice: "KES 4,200",
-    meta: "Type-C · Dual output",
+    meta: "Type-C / Dual output",
     art: "powerbank",
   },
 ];
@@ -156,55 +158,55 @@ export default function Home() {
   return (
     <main>
       <section className="delivery-strip">
-        <span>Free delivery on orders over KES 5,000</span>
+        <span>Free Delivery on Orders Over KES 5,000</span>
       </section>
 
       <header className="store-header">
-        <div className="site-shell header-grid">
-          <a className="brand-lockup" href="#" aria-label="Crystal Shop home">
-            <span className="brand-symbol">CR</span>
-            <span className="brand-text">
-              Crystal<span>Shop</span>
-            </span>
+        <div className="site-shell header-topline">
+          <a className="brand-lockup" href="#" aria-label="Crystal Store home">
+            Crystal<span>Store</span>
           </a>
 
-          <label className="search-bar" htmlFor="site-search">
-            <span>Search</span>
-            <input
-              id="site-search"
-              name="search"
-              placeholder="Search phones, laptops, chargers..."
-              type="search"
-            />
-          </label>
-
-          <nav className="header-actions" aria-label="Customer shortcuts">
-            <a href="#repairs">Repairs</a>
-            <a href="#contact">WhatsApp</a>
-            <a className="cart-pill" href="#shop">
-              Cart · 0
-            </a>
-          </nav>
+          <div className="header-tools">
+            <label className="search-trigger" htmlFor="site-search">
+              <span>Search</span>
+              <input
+                id="site-search"
+                name="search"
+                placeholder="Search gadgets..."
+                type="search"
+              />
+            </label>
+            {utilityLinks.map((link) => (
+              <a
+                className={link.startsWith("Cart") ? "cart-pill" : undefined}
+                href="#shop"
+                key={link}
+              >
+                {link}
+              </a>
+            ))}
+          </div>
         </div>
+
+        <nav className="header-nav" aria-label="Main navigation">
+          <div className="site-shell header-nav-inner">
+            {navLinks.map((item) => (
+              <a href={item === "Contact" ? "#contact" : "#shop"} key={item}>
+                {item}
+              </a>
+            ))}
+          </div>
+        </nav>
       </header>
-
-      <nav className="category-rail" aria-label="Product categories">
-        <div className="site-shell category-rail-inner">
-          {categoryRail.map((item) => (
-            <a href="#categories" key={item}>
-              {item}
-            </a>
-          ))}
-        </div>
-      </nav>
 
       <section className="site-shell hero-grid">
         <article className="hero-card hero-card-main">
           <div className="hero-copy">
-            <p className="eyebrow">Crystal Edit · Nairobi stock</p>
+            <p className="eyebrow">Crystal Edit / Nairobi stock</p>
             <h1>Electronics with a shop-floor heartbeat.</h1>
             <p>
-              Phones, laptops, audio, gaming gear and repair support — packed
+              Phones, laptops, audio, gaming gear and repair support - packed
               into one storefront that will connect directly to the POS,
               inventory and M-PESA backend.
             </p>
@@ -253,16 +255,16 @@ export default function Home() {
 
       <section className="deal-marquee" aria-label="Current promotions">
         <div className="site-shell deal-marquee-inner">
-          <span>Top deal · Extra 10% off selected audio</span>
-          <span>Clearance · Accessories from KES 250</span>
-          <span>Bundle save · Phone + charger + protector</span>
+          <span>Top deal / Extra 10% off selected audio</span>
+          <span>Clearance / Accessories from KES 250</span>
+          <span>Bundle save / Phone + charger + protector</span>
         </div>
       </section>
 
       <section className="site-shell section-block" id="shop">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Live · Most wanted</p>
+            <p className="eyebrow">Live / Most wanted</p>
             <h2>What Nairobi is buying right now.</h2>
           </div>
           <a href="#categories">View all products</a>
@@ -354,7 +356,7 @@ export default function Home() {
         </div>
         {testimonials.map((item) => (
           <article className="testimonial-card" key={item.name}>
-            <p>“{item.quote}”</p>
+            <p>&quot;{item.quote}&quot;</p>
             <strong>{item.name}</strong>
             <span>{item.place}</span>
           </article>
@@ -371,7 +373,7 @@ export default function Home() {
               Your gadgets, accessories, repairs and checkout experience in one
               connected electronics store.
             </p>
-            <strong>M-PESA accepted · Secure checkout</strong>
+            <strong>M-PESA accepted / Secure checkout</strong>
           </div>
 
           <div>
@@ -395,7 +397,7 @@ export default function Home() {
             <h3>Contact</h3>
             <a href="tel:+254700000000">+254 700 000 000</a>
             <a href="mailto:sales@example.com">sales@example.com</a>
-            <p>Nairobi CBD · Branch pickup · Countrywide delivery</p>
+            <p>Nairobi CBD / Branch pickup / Countrywide delivery</p>
           </div>
         </div>
       </footer>
