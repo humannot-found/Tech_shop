@@ -57,7 +57,7 @@ const navItems: NavItem[] = [
   {
     key: "inventory",
     label: "Inventory",
-    description: "Live stock balances, serialized units, adjustments, and transfers.",
+    description: "Live stock levels, trackable devices, corrections, and branch transfers.",
     roles: ["admin", "owner", "branch_manager", "inventory_manager", "cashier"],
     permissions: [
       "inventory.view",
@@ -84,14 +84,14 @@ const navItems: NavItem[] = [
   {
     key: "purchases",
     label: "Purchases",
-    description: "Supplier setup, purchase orders, approvals, and goods receiving.",
+    description: "Supplier setup, purchase orders, approvals, and stock receiving.",
     roles: ["admin", "owner", "branch_manager", "inventory_manager"],
     permissions: ["purchases.create", "purchases.approve", "purchases.receive"],
   },
   {
     key: "expenses",
     label: "Expenses",
-    description: "Operating cost capture, category control, and approval workflow.",
+    description: "Operating cost capture, category control, and approval steps.",
     roles: ["admin", "owner", "branch_manager", "accountant"],
     permissions: ["expenses.view", "expenses.manage"],
   },

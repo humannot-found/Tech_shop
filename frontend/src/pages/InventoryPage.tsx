@@ -412,7 +412,7 @@ export function InventoryPage() {
 
         setNotice(
           failed
-            ? "Some inventory operations are unavailable or not permitted. Local preview data remains visible where needed."
+            ? "Some inventory actions are unavailable or not permitted. Local preview data remains visible where needed."
             : null,
         );
       },
@@ -514,6 +514,38 @@ export function InventoryPage() {
     return "neutral";
   }
 
+  function movementLabel(type: string) {
+    const labels: Record<string, string> = {
+      adjustment: "Stock correction",
+      purchase_receipt: "Supplier stock received",
+      repair_usage: "Used in repair",
+      reservation: "Reserved for order",
+      reservation_release: "Reservation released",
+      return: "Returned to stock",
+      sale: "Sold at POS",
+      transfer_in: "Received from another branch",
+      transfer_out: "Sent to another branch",
+    };
+    return labels[type] ?? titleize(type);
+  }
+
+  function referenceLabel(type: string) {
+    const labels: Record<string, string> = {
+      approval_request: "Approved correction",
+      goods_receipt: "Stock receiving",
+      pos_sale: "POS sale",
+      purchase_order: "Purchase order",
+      repair_part_removal: "Repair part restored",
+      repair_ticket: "Repair ticket",
+      sale: "POS sale",
+      sale_return: "Customer return",
+      sale_void: "Voided sale",
+      stock_count: "Physical count",
+      stock_transfer: "Branch transfer",
+    };
+    return labels[type] ?? titleize(type);
+  }
+
   function requestChangeSummary(request: ApprovalRequest) {
     const change = request.requested_changes ?? {};
     const sku = typeof change.sku === "string" ? change.sku : request.resource_type;
@@ -549,23 +581,23 @@ export function InventoryPage() {
     const quantityDelta = Number(adjustmentForm.quantity_delta);
 
     if (!selectedBranchId || !selectedAdjustmentBalance) {
-      setNotice("Select a stock item before requesting an adjustment.");
+      setNotice("Select a stock item before requesting a correction.");
       return;
     }
     if (!quantityDelta) {
-      setNotice("Adjustment quantity cannot be zero.");
+      setNotice("Correction quantity cannot be zero.");
       return;
     }
     if (selectedAdjustmentBalance.quantity_on_hand + quantityDelta < 0) {
-      setNotice("Adjustment cannot reduce on-hand stock below zero.");
+      setNotice("Correction cannot reduce on-hand stock below zero.");
       return;
     }
     if (!adjustmentForm.reason.trim()) {
-      setNotice("Adjustment reason is required.");
+      setNotice("Correction reason is required.");
       return;
     }
     if (adjustmentForm.reason.trim().length < 8) {
-      setNotice("Add a clearer adjustment reason before sending it for approval.");
+      setNotice("Add a clearer correction reason before sending it for approval.");
       return;
     }
 
@@ -594,7 +626,7 @@ export function InventoryPage() {
         };
         setAdjustments((current) => [request, ...current]);
         setAdjustmentForm((current) => ({ ...current, reason: "" }));
-        setNotice("Preview adjustment request created locally.");
+        setNotice("Preview stock correction request created locally.");
         return;
       }
 
@@ -607,10 +639,10 @@ export function InventoryPage() {
       });
       setAdjustments((current) => [request, ...current]);
       setAdjustmentForm((current) => ({ ...current, reason: "" }));
-      setNotice("Stock adjustment request created.");
+      setNotice("Stock correction request created.");
     } catch (error) {
       setNotice(
-        error instanceof Error ? error.message : "Could not request stock adjustment.",
+        error instanceof Error ? error.message : "Could not request stock correction.",
       );
     } finally {
       setBusy(false);
@@ -631,7 +663,7 @@ export function InventoryPage() {
           decision_note: approved ? "Approved in preview." : "Rejected in preview.",
           updated_at: new Date().toISOString(),
         });
-        setNotice(`Preview adjustment ${approved ? "approved" : "rejected"}.`);
+        setNotice(`Preview stock correction ${approved ? "approved" : "rejected"}.`);
         return;
       }
 
@@ -640,9 +672,9 @@ export function InventoryPage() {
         decision_note: approved ? "Approved from inventory screen." : "Rejected.",
       });
       updateAdjustment(decided);
-      setNotice(`Adjustment request ${titleize(decided.status)}.`);
+      setNotice(`Stock correction request ${titleize(decided.status)}.`);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not decide adjustment.");
+      setNotice(error instanceof Error ? error.message : "Could not decide stock correction.");
     } finally {
       setBusy(false);
     }
@@ -653,7 +685,7 @@ export function InventoryPage() {
     const quantity = Number(transferForm.quantity);
 
     if (!selectedBranchId || !selectedTransferBalance) {
-      setNotice("Select source branch stock before creating a transfer.");
+      setNotice("Select the stock item to move before creating a branch transfer.");
       return;
     }
     if (!transferForm.destination_branch_id) {
@@ -665,12 +697,12 @@ export function InventoryPage() {
       return;
     }
     if (!quantity || quantity <= 0) {
-      setNotice("Transfer quantity must be greater than zero.");
+      setNotice("Move quantity must be greater than zero.");
       return;
     }
     if (quantity > selectedTransferBalance.available_quantity) {
       setNotice(
-        `Only ${integer(selectedTransferBalance.available_quantity)} unit(s) are available to transfer.`,
+        `Only ${integer(selectedTransferBalance.available_quantity)} unit(s) are available to move.`,
       );
       return;
     }
@@ -713,7 +745,7 @@ export function InventoryPage() {
         setTransfers((current) => [transfer, ...current]);
         setSelectedTransferId(transfer.id);
         setTransferForm((current) => ({ ...current, notes: "" }));
-        setNotice("Preview transfer created locally.");
+        setNotice("Preview branch transfer created locally.");
         return;
       }
 
@@ -732,9 +764,9 @@ export function InventoryPage() {
       setTransfers((current) => [transfer, ...current]);
       setSelectedTransferId(transfer.id);
       setTransferForm((current) => ({ ...current, notes: "" }));
-      setNotice(`Created transfer ${transfer.transfer_number}.`);
+      setNotice(`Created branch transfer ${transfer.transfer_number}.`);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not create transfer.");
+      setNotice(error instanceof Error ? error.message : "Could not create branch transfer.");
     } finally {
       setBusy(false);
     }
@@ -744,7 +776,7 @@ export function InventoryPage() {
     action: "approve" | "dispatch" | "receive" | "cancel",
   ) {
     if (!selectedTransfer) {
-      setNotice("Select a transfer first.");
+      setNotice("Select a branch transfer first.");
       return;
     }
 
@@ -760,7 +792,7 @@ export function InventoryPage() {
                 ? "received"
                 : "cancelled";
         updateTransfer(updateTransferStatus(selectedTransfer, nextStatus));
-        setNotice(`Preview transfer marked ${titleize(nextStatus)}.`);
+        setNotice(`Preview branch transfer marked ${titleize(nextStatus)}.`);
         return;
       }
 
@@ -775,7 +807,7 @@ export function InventoryPage() {
       updateTransfer(updated);
       setNotice(`${updated.transfer_number} is now ${titleize(updated.status)}.`);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : `Could not ${action} transfer.`);
+      setNotice(error instanceof Error ? error.message : `Could not ${action} branch transfer.`);
     } finally {
       setBusy(false);
     }
@@ -785,7 +817,7 @@ export function InventoryPage() {
     event.preventDefault();
 
     if (!selectedBranchId || !selectedCountBalance) {
-      setNotice("Select a stock item before creating a count.");
+      setNotice("Select a stock item before starting a physical count.");
       return;
     }
 
@@ -824,7 +856,7 @@ export function InventoryPage() {
         setStockCounts((current) => [count, ...current]);
         setSelectedCountId(count.id);
         setCountForm((current) => ({ ...current, notes: "" }));
-        setNotice("Preview stock count created locally.");
+        setNotice("Preview physical count created locally.");
         return;
       }
 
@@ -836,9 +868,9 @@ export function InventoryPage() {
       setStockCounts((current) => [count, ...current]);
       setSelectedCountId(count.id);
       setCountForm((current) => ({ ...current, notes: "" }));
-      setNotice(`Created stock count ${count.count_number}.`);
+      setNotice(`Started physical count ${count.count_number}.`);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not create stock count.");
+      setNotice(error instanceof Error ? error.message : "Could not start physical count.");
     } finally {
       setBusy(false);
     }
@@ -847,7 +879,7 @@ export function InventoryPage() {
   async function handleUpdateCountItem(event: FormEvent) {
     event.preventDefault();
     if (!selectedCount) {
-      setNotice("Select a stock count first.");
+      setNotice("Select a physical count first.");
       return;
     }
     const selectedItem = selectedCount.items.find(
@@ -856,7 +888,7 @@ export function InventoryPage() {
     const countedQuantity = Number(countItemForm.counted_quantity);
 
     if (!selectedItem) {
-      setNotice("Select a count line first.");
+      setNotice("Select an item line first.");
       return;
     }
     if (Number.isNaN(countedQuantity) || countedQuantity < 0) {
@@ -882,7 +914,7 @@ export function InventoryPage() {
               : item,
           ),
         });
-        setNotice("Preview count line updated locally.");
+        setNotice("Preview counted quantity updated locally.");
         return;
       }
 
@@ -896,9 +928,9 @@ export function InventoryPage() {
         },
       );
       updateCount(count);
-      setNotice("Stock count line updated.");
+      setNotice("Counted quantity saved.");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not update count line.");
+      setNotice(error instanceof Error ? error.message : "Could not save counted quantity.");
     } finally {
       setBusy(false);
     }
@@ -906,13 +938,13 @@ export function InventoryPage() {
 
   async function handleCountAction(action: "submit" | "approve" | "cancel") {
     if (!selectedCount) {
-      setNotice("Select a stock count first.");
+      setNotice("Select a physical count first.");
       return;
     }
     const summary = countVarianceSummary(selectedCount);
     if ((action === "submit" || action === "approve") && summary.openLines > 0) {
       setNotice(
-        `Finish all count lines first. ${integer(summary.openLines)} line(s) still need counted quantities.`,
+        `Finish all item lines first. ${integer(summary.openLines)} line(s) still need counted quantities.`,
       );
       return;
     }
@@ -927,7 +959,7 @@ export function InventoryPage() {
               ? "approved"
               : "cancelled";
         updateCount(updateCountStatus(selectedCount, nextStatus));
-        setNotice(`Preview stock count marked ${titleize(nextStatus)}.`);
+        setNotice(`Preview physical count marked ${titleize(nextStatus)}.`);
         return;
       }
 
@@ -940,7 +972,7 @@ export function InventoryPage() {
       updateCount(updated);
       setNotice(`${updated.count_number} is now ${titleize(updated.status)}.`);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : `Could not ${action} count.`);
+      setNotice(error instanceof Error ? error.message : `Could not ${action} physical count.`);
     } finally {
       setBusy(false);
     }
@@ -976,7 +1008,7 @@ export function InventoryPage() {
 
       <section className="inventory-filter-bar">
         <label>
-          Search stock / IMEI
+          Find stock / device
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -984,7 +1016,7 @@ export function InventoryPage() {
           />
         </label>
         <label>
-          Stock focus
+          Show stock
           <select
             value={balanceFilter}
             onChange={(event) => setBalanceFilter(event.target.value as BalanceFilter)}
@@ -995,7 +1027,7 @@ export function InventoryPage() {
           </select>
         </label>
         <label>
-          Serialized status
+          Device status
           <select
             value={serializedStatus}
             onChange={(event) =>
@@ -1010,25 +1042,25 @@ export function InventoryPage() {
           </select>
         </label>
         <label>
-          Movement history
+          Stock activity shown
           <select
             value={movementScope}
             onChange={(event) => setMovementScope(event.target.value as MovementScope)}
           >
             <option value="selected">Selected item</option>
-            <option value="all">All recent movement</option>
+            <option value="all">All recent activity</option>
           </select>
         </label>
       </section>
 
       <div className="stats-grid">
         <article className="metric-card">
-          <span>Total on hand</span>
+          <span>Total stock counted</span>
           <strong>{integer(totals.onHand)}</strong>
           <StatusPill tone="info">Units</StatusPill>
         </article>
         <article className="metric-card">
-          <span>Available</span>
+          <span>Available to sell</span>
           <strong>{integer(totals.available)}</strong>
           <StatusPill tone="success">Sellable</StatusPill>
         </article>
@@ -1040,7 +1072,7 @@ export function InventoryPage() {
           </StatusPill>
         </article>
         <article className="metric-card">
-          <span>Pending adjustments</span>
+          <span>Pending corrections</span>
           <strong>{integer(totals.pendingAdjustments)}</strong>
           <StatusPill tone={totals.pendingAdjustments ? "warning" : "success"}>
             Approval
@@ -1052,7 +1084,7 @@ export function InventoryPage() {
         <section className="panel-card inventory-focus-card">
           <header className="panel-card__header panel-card__header--compact">
             <div>
-              <p className="eyebrow">Selected stock</p>
+              <p className="eyebrow">Selected item</p>
               <h2>{selectedStockBalance?.sku ?? "No item selected"}</h2>
             </div>
             {selectedStockBalance && (
@@ -1085,7 +1117,7 @@ export function InventoryPage() {
                 </span>
                 <span>
                   <b>{integer(selectedMovements.length)}</b>
-                  Recent moves
+                  Recent activity
                 </span>
               </div>
               <div className="inventory-health-strip">
@@ -1116,8 +1148,8 @@ export function InventoryPage() {
             </div>
           ) : (
             <p className="empty-panel-message">
-              Select a stock balance to see its controls, devices, and recent
-              movement history.
+              Select an item to see its controls, devices, and recent stock
+              activity.
             </p>
           )}
         </section>
@@ -1155,7 +1187,7 @@ export function InventoryPage() {
         <section className="panel-card">
           <header className="panel-card__header panel-card__header--compact">
             <div>
-              <p className="eyebrow">Serialized stock</p>
+              <p className="eyebrow">Tracked devices</p>
               <h2>Trackable devices</h2>
             </div>
             <StatusPill tone="neutral">
@@ -1193,8 +1225,8 @@ export function InventoryPage() {
         <section className="panel-card">
           <header className="panel-card__header">
             <div>
-              <p className="eyebrow">Stock control</p>
-              <h2>Adjust or transfer stock</h2>
+              <p className="eyebrow">Stock actions</p>
+              <h2>Correct counts or move stock</h2>
             </div>
           </header>
 
@@ -1212,15 +1244,15 @@ export function InventoryPage() {
             {selectedAdjustmentBalance && (
               <div className="inventory-operation-preview">
                 <div>
-                  <span>Requested change</span>
+                  <span>Change requested</span>
                   <strong>{signedQuantity(adjustmentDelta)}</strong>
                 </div>
                 <div>
-                  <span>Projected on hand</span>
+                  <span>Stock after approval</span>
                   <strong>{integer(adjustmentProjectedOnHand ?? 0)}</strong>
                 </div>
                 <div>
-                  <span>Projected available</span>
+                  <span>Sellable after approval</span>
                   <strong>{integer(adjustmentProjectedAvailable ?? 0)}</strong>
                 </div>
                 <StatusPill
@@ -1257,7 +1289,7 @@ export function InventoryPage() {
                 </select>
               </label>
               <label>
-                Quantity change
+                Add/remove quantity
                 <input
                   type="number"
                   value={adjustmentForm.quantity_delta}
@@ -1272,7 +1304,7 @@ export function InventoryPage() {
               </label>
             </div>
             <label>
-              Reason
+              Reason for correction
               <textarea
                 value={adjustmentForm.reason}
                 onChange={(event) =>
@@ -1286,13 +1318,13 @@ export function InventoryPage() {
             </label>
             <div className="form-footer">
               <button className="primary-button" disabled={busy}>
-                Request Stock Correction
+                Send Correction for Approval
               </button>
             </div>
           </form>
 
           <form className="form-panel form-panel--bordered" onSubmit={handleCreateTransfer}>
-            <strong>Request branch transfer</strong>
+            <strong>Move stock to another branch</strong>
             {selectedTransferBalance && (
               <div className="stock-action-context">
                 <span>{balanceLabel(selectedTransferBalance)}</span>
@@ -1304,7 +1336,7 @@ export function InventoryPage() {
             {selectedTransferBalance && (
               <div className="inventory-operation-preview">
                 <div>
-                  <span>Moving</span>
+                  <span>Quantity to move</span>
                   <strong>{integer(transferQuantity)}</strong>
                 </div>
                 <div>
@@ -1312,7 +1344,7 @@ export function InventoryPage() {
                   <strong>{integer(transferProjectedAvailable ?? 0)}</strong>
                 </div>
                 <div>
-                  <span>Destination</span>
+                  <span>Receiving branch</span>
                   <strong>
                     {transferForm.destination_branch_id
                       ? branchName(transferForm.destination_branch_id)
@@ -1331,7 +1363,7 @@ export function InventoryPage() {
                         : "success"
                   }
                 >
-                  Transfer check
+                  Move check
                 </StatusPill>
               </div>
             )}
@@ -1355,7 +1387,7 @@ export function InventoryPage() {
                 </select>
               </label>
               <label>
-                Destination
+                Receiving branch
                 <select
                   value={transferForm.destination_branch_id}
                   onChange={(event) =>
@@ -1376,7 +1408,7 @@ export function InventoryPage() {
             </div>
             <div className="form-grid form-grid--two">
               <label>
-                Quantity
+                Quantity to move
                 <input
                   type="number"
                   min="1"
@@ -1391,7 +1423,7 @@ export function InventoryPage() {
                 />
               </label>
               <label>
-                Notes
+                Reason for moving
                 <input
                   value={transferForm.notes}
                   onChange={(event) =>
@@ -1406,7 +1438,7 @@ export function InventoryPage() {
             </div>
             <div className="form-footer">
               <button className="secondary-button" disabled={busy}>
-                Request Branch Transfer
+                Send Transfer Request
               </button>
             </div>
           </form>
@@ -1416,7 +1448,7 @@ export function InventoryPage() {
           <header className="panel-card__header">
             <div>
               <p className="eyebrow">Physical stock check</p>
-              <h2>{selectedCount?.count_number ?? "Count stock physically"}</h2>
+              <h2>{selectedCount?.count_number ?? "Start a physical stock count"}</h2>
             </div>
           </header>
 
@@ -1449,7 +1481,7 @@ export function InventoryPage() {
                 </select>
               </label>
               <label>
-                Count reason / notes
+                Reason for count
                 <textarea
                   value={countForm.notes}
                   onChange={(event) =>
@@ -1478,18 +1510,18 @@ export function InventoryPage() {
 
                 <div className="inventory-count-summary">
                   <div>
-                    <span>Lines checked</span>
+                    <span>Items checked</span>
                     <strong>
                       {integer(selectedCountSummary.countedLines)} /{" "}
                       {integer(selectedCountSummary.totalLines)}
                     </strong>
                   </div>
                   <div>
-                    <span>Expected</span>
+                    <span>System shows</span>
                     <strong>{integer(selectedCountSummary.expected)}</strong>
                   </div>
                   <div>
-                    <span>Counted</span>
+                    <span>Physically counted</span>
                     <strong>{integer(selectedCountSummary.counted)}</strong>
                   </div>
                   <div>
@@ -1500,7 +1532,7 @@ export function InventoryPage() {
 
                 <form className="action-form" onSubmit={handleUpdateCountItem}>
                   <label>
-                    Item / SKU counted
+                    Item / SKU being counted
                     <select
                       value={countItemForm.item_id}
                       onChange={(event) => {
@@ -1516,7 +1548,7 @@ export function InventoryPage() {
                     >
                       {selectedCount.items.map((item) => (
                         <option key={item.id} value={item.id}>
-                          {variantLabel(item.variant_id)} · expected{" "}
+                          {variantLabel(item.variant_id)} · system shows{" "}
                           {integer(item.expected_quantity)}
                         </option>
                       ))}
@@ -1524,7 +1556,7 @@ export function InventoryPage() {
                   </label>
                   <div className="form-grid form-grid--two">
                     <label>
-                      Physical quantity counted
+                      Quantity physically counted
                       <input
                         type="number"
                         min="0"
@@ -1538,7 +1570,7 @@ export function InventoryPage() {
                       />
                     </label>
                     <label>
-                      Count note / reason
+                      Counting note
                       <input
                         value={countItemForm.notes}
                         onChange={(event) =>
@@ -1551,12 +1583,12 @@ export function InventoryPage() {
                     </label>
                   </div>
                   <button className="secondary-button" disabled={busy}>
-                    Save Physical Count
+                    Save Counted Quantity
                   </button>
                 </form>
 
                 <div className="action-form">
-                  <label>Count review</label>
+                  <label>Count approval</label>
                   <div className="table-actions">
                     <button
                       className="secondary-button"
@@ -1564,7 +1596,7 @@ export function InventoryPage() {
                       onClick={() => void handleCountAction("submit")}
                       type="button"
                     >
-                      Submit Count for Review
+                      Send Count for Review
                     </button>
                     <button
                       className="secondary-button"
@@ -1592,7 +1624,7 @@ export function InventoryPage() {
 
             {selectedTransfer && (
               <div className="action-form">
-                <label>Selected transfer</label>
+                <label>Branch transfer selected</label>
                 <div className="selected-ticket-card">
                   <strong>{selectedTransfer.transfer_number}</strong>
                   <span>
@@ -1618,7 +1650,7 @@ export function InventoryPage() {
                     onClick={() => void handleTransferAction("dispatch")}
                     type="button"
                   >
-                    Dispatch
+                    Mark as sent
                   </button>
                   <button
                     className="secondary-button"
@@ -1626,7 +1658,7 @@ export function InventoryPage() {
                     onClick={() => void handleTransferAction("receive")}
                     type="button"
                   >
-                    Receive
+                    Mark as received
                   </button>
                 </div>
               </div>
@@ -1638,7 +1670,7 @@ export function InventoryPage() {
       <section className="panel-card m-t">
         <header className="panel-card__header">
           <div>
-            <p className="eyebrow">Stock balances</p>
+            <p className="eyebrow">Branch stock</p>
             <h2>Products in branch stock</h2>
           </div>
           <StatusPill tone="neutral">{integer(visibleBalances.length)} shown</StatusPill>
@@ -1685,7 +1717,7 @@ export function InventoryPage() {
             ) : (
               <tr>
                 <td colSpan={7} className="empty-table-cell">
-                  No stock balances match the current filters.
+                  No branch stock records match the current filters.
                 </td>
               </tr>
             )}
@@ -1697,8 +1729,8 @@ export function InventoryPage() {
         <section className="panel-card">
           <header className="panel-card__header">
             <div>
-              <p className="eyebrow">Adjustments</p>
-              <h2>Approval queue</h2>
+              <p className="eyebrow">Stock corrections</p>
+              <h2>Correction approval queue</h2>
             </div>
           </header>
           <table className="data-table">
@@ -1707,7 +1739,7 @@ export function InventoryPage() {
                 <th>Change</th>
                 <th>Reason</th>
                 <th>Status</th>
-                <th>Decision</th>
+                <th>Manager action</th>
               </tr>
             </thead>
             <tbody>
@@ -1752,7 +1784,7 @@ export function InventoryPage() {
               ) : (
                 <tr>
                   <td colSpan={4} className="empty-table-cell">
-                    No stock adjustment requests are waiting in this branch.
+                    No stock correction requests are waiting in this branch.
                   </td>
                 </tr>
               )}
@@ -1763,14 +1795,14 @@ export function InventoryPage() {
         <section className="panel-card">
           <header className="panel-card__header">
             <div>
-              <p className="eyebrow">Transfers</p>
-              <h2>Branch movement</h2>
+              <p className="eyebrow">Branch transfers</p>
+              <h2>Stock moved between branches</h2>
             </div>
           </header>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Transfer</th>
+                <th>Transfer ref</th>
                 <th>Route</th>
                 <th>Items</th>
                 <th>Status</th>
@@ -1818,17 +1850,17 @@ export function InventoryPage() {
           <header className="panel-card__header">
             <div>
               <p className="eyebrow">Physical stock checks</p>
-              <h2>Count history</h2>
+              <h2>Physical count history</h2>
             </div>
           </header>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Count</th>
+                <th>Count ref</th>
                 <th>Status</th>
-                <th>Lines</th>
+                <th>Items checked</th>
                 <th>Variance</th>
-                <th>Submitted</th>
+                <th>Sent for review</th>
               </tr>
             </thead>
             <tbody>
@@ -1869,7 +1901,7 @@ export function InventoryPage() {
         <section className="panel-card">
           <header className="panel-card__header">
             <div>
-              <p className="eyebrow">Movements</p>
+              <p className="eyebrow">Stock activity</p>
               <h2>
                 {movementScope === "all"
                   ? "All recent stock activity"
@@ -1877,17 +1909,17 @@ export function InventoryPage() {
               </h2>
             </div>
             <StatusPill tone="neutral">
-              {integer(selectedMovements.length)} moves
+              {integer(selectedMovements.length)} records
             </StatusPill>
           </header>
           <table className="data-table">
             <thead>
               <tr>
                 <th>Date</th>
-                <th>Type</th>
-                <th>Qty</th>
+                <th>Activity</th>
+                <th>Qty change</th>
                 <th>Cost per item</th>
-                <th>Reference</th>
+                <th>Source</th>
               </tr>
             </thead>
             <tbody>
@@ -1897,13 +1929,13 @@ export function InventoryPage() {
                     <td>{dateLabel(movement.created_at)}</td>
                     <td>
                       <StatusPill tone={movementTone(movement)}>
-                        {titleize(movement.movement_type)}
+                        {movementLabel(movement.movement_type)}
                       </StatusPill>
                     </td>
                     <td>{signedQuantity(movement.quantity_delta)}</td>
                     <td>{movement.unit_cost ? money(movement.unit_cost) : "-"}</td>
                     <td>
-                      {titleize(movement.reference_type)}
+                      {referenceLabel(movement.reference_type)}
                       {movement.note ? <span>{movement.note}</span> : null}
                     </td>
                   </tr>
@@ -1912,8 +1944,8 @@ export function InventoryPage() {
                 <tr>
                   <td colSpan={5} className="empty-table-cell">
                     {movementScope === "all"
-                      ? "No recent stock movement for this branch yet."
-                      : "No movement history for the selected stock item yet."}
+                      ? "No recent stock activity for this branch yet."
+                      : "No stock activity for the selected item yet."}
                   </td>
                 </tr>
               )}

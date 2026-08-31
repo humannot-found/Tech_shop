@@ -204,7 +204,7 @@ function roleProfile(user: CurrentUser | null) {
       eyebrow: "Finance review",
       title: "Reports and expense desk",
       description:
-        "Review sales, expense movement, stock valuation, and repair revenue without touching operational workflows.",
+        "Review sales, expense totals, stock valuation, and repair revenue without making operational changes.",
       action: "Open Reports",
       view: "reports" as AppView,
     };
@@ -289,7 +289,7 @@ function focusFor(user: CurrentUser | null, summary: DashboardSummary) {
     return [
       ["Review low stock", `${integer(summary.inventory.low_stock_count)} item(s) are below reorder level.`, summary.inventory.low_stock_count ? "danger" : "success"],
       ["Receive pending stock", "Stock receiving should update inventory immediately.", "info"],
-      ["Keep counts moving", "Counts and transfers explain branch quantity differences.", "neutral"],
+      ["Check physical stock", "Physical counts and branch transfers explain quantity differences.", "neutral"],
     ] as const;
   }
   if (roleIs(user, "accountant")) {
@@ -326,7 +326,7 @@ function actionsFor(user: CurrentUser | null): Action[] {
   }
   if (roleIs(user, "inventory_manager")) {
     return [
-      { label: "Inventory", description: "Check stock balances", view: "inventory" },
+      { label: "Inventory", description: "Check branch stock", view: "inventory" },
       { label: "Purchases", description: "Create or receive POs", view: "purchases" },
       { label: "Catalog", description: "View item setup", view: "catalog" },
       { label: "Reports", description: "Inventory summaries", view: "reports" },
@@ -741,7 +741,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
           <header className="panel-card__header">
             <div>
               <p className="eyebrow">Quick actions</p>
-              <h2>Open a workflow</h2>
+              <h2>Open a module</h2>
             </div>
           </header>
           <div className="quick-actions-grid quick-actions-grid--cards">
