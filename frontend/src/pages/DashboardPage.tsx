@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ApiError,
@@ -40,7 +40,7 @@ type ReportResult =
   | { key: "repairs"; data: DashboardSummary["repairs"] }
   | { key: "expenses"; data: DashboardSummary["expenses"] };
 
-const dashboardRefreshMs = 30_000;
+const dashboardRefreshMs = 15_000;
 const emptyLoaded = {
   sales: false,
   inventory: false,
@@ -358,6 +358,20 @@ function EmptyRow({ colSpan, message }: { colSpan: number; message: string }) {
   );
 }
 
+function dashboardActivitySignature(summary: DashboardSummary) {
+  return [
+    summary.sales.sale_count,
+    summary.sales.net_sales,
+    summary.inventory.total_available,
+    summary.inventory.low_stock_count,
+    summary.repairs.open_ticket_count,
+    summary.repairs.ready_ticket_count,
+    summary.expenses.pending_expense_count,
+    summary.approvals.total_pending_count,
+    summary.approvals.latest_requested_at,
+  ].join("|");
+}
+
 export function DashboardPage({ onNavigate }: DashboardPageProps) {
   const { token, user, isPreview } = useAuth();
   const [summary, setSummary] = useState<DashboardSummary>(isPreview ? demoDashboard : emptySummary);
@@ -366,7 +380,10 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [liveRefreshEnabled, setLiveRefreshEnabled] = useState(true);
   const [refreshTick, setRefreshTick] = useState(0);
+  const previousActivitySignature = useRef<string | null>(null);
+  const previousPendingApprovalCount = useRef<number | null>(null);
 
   useEffect(() => {
     if (isPreview) {
@@ -380,7 +397,8 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
       });
       setLastUpdatedAt(new Date().toISOString());
       setIsRefreshing(false);
-      setNotice("Preview mode is using local dashboard data.");
+      previousActivitySignature.current = dashboardActivitySignature(demoDashboard);
+      previousPendingApprovalCount.current = demoDashboard.approvals.total_pending_count;
       return;
     }
     if (!token) return;
@@ -456,22 +474,37 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
       }
 
       if (!active) return;
+      const nextSignature = dashboardActivitySignature(next);
+      const previousSignature = previousActivitySignature.current;
+      const previousPendingCount = previousPendingApprovalCount.current;
+      const nextPendingCount = next.approvals.total_pending_count;
+      const dashboardChanged =
+        previousSignature !== null && previousSignature !== nextSignature;
+
+      previousActivitySignature.current = nextSignature;
+      previousPendingApprovalCount.current = nextPendingCount;
+
       setSummary(next);
       setLoaded(nextLoaded);
       setLastUpdatedAt(new Date().toISOString());
       setIsRefreshing(false);
-      setNotice(
-        failures > 0 && attempts > 0
-          ? "Some live dashboard widgets are unavailable for this role. Showing only the sections this account can access."
-          : null,
-      );
+
+      if (failures > 0 && attempts > 0) {
+        setNotice(
+          "Some live dashboard widgets are unavailable for this role. Showing only the sections this account can access.",
+        );
+      } else if (
+        previousPendingCount !== null &&
+        nextPendingCount > previousPendingCount
+      ) {
+        setNotice(
+          `New approval activity received. ${integer(nextPendingCount)} request(s) now need review.`,
+        );
+      } else if (dashboardChanged) {
+        setNotice("Dashboard updated with the latest shop activity.");
+      }
     }
 
-    if (!lastUpdatedAt) {
-      setSummary(emptySummary);
-      setLoaded(emptyLoaded);
-    }
-    setNotice(null);
     void loadDashboard();
 
     return () => {
@@ -480,14 +513,28 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
   }, [isPreview, refreshTick, token, user]);
 
   useEffect(() => {
-    if (!token || isPreview) return;
+    if (!token || isPreview || !liveRefreshEnabled) return;
     const timer = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       setRefreshTick((current) => current + 1);
     }, dashboardRefreshMs);
     return () => window.clearInterval(timer);
-  }, [isPreview, token]);
+  }, [isPreview, liveRefreshEnabled, token]);
 
   function handleRefresh() {
+    setNotice("Refreshing dashboard data...");
+    setRefreshTick((current) => current + 1);
+  }
+
+  function handleToggleLiveRefresh() {
+    if (liveRefreshEnabled) {
+      setLiveRefreshEnabled(false);
+      setNotice("Live dashboard updates paused. Use Refresh Now to update manually.");
+      return;
+    }
+
+    setLiveRefreshEnabled(true);
+    setNotice("Live dashboard updates resumed.");
     setRefreshTick((current) => current + 1);
   }
 
@@ -505,6 +552,17 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
   const showExpenses = canLoadExpenses(user) || loaded.expenses;
   const showApprovals = loaded.approvals;
   const loadedSectionCount = Object.values(loaded).filter(Boolean).length;
+  const refreshCycleSeconds = Math.round(dashboardRefreshMs / 1000);
+  const liveRefreshAvailable = Boolean(token && !isPreview);
+  const liveStatusLabel = !liveRefreshAvailable
+    ? isPreview
+      ? "Preview data"
+      : "Sign in required"
+    : liveRefreshEnabled
+      ? isRefreshing
+        ? "Refreshing..."
+        : "Live updates on"
+      : "Live updates paused";
   const stockApprovalCount =
     summary.approvals.pending_stock_adjustment_count +
     summary.approvals.pending_stock_transfer_count +
@@ -587,8 +645,8 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
 
       <section className="dashboard-live-strip">
         <article>
-          <span>Dashboard refresh</span>
-          <strong>{isRefreshing ? "Refreshing..." : "Auto-refresh on"}</strong>
+          <span>Live dashboard</span>
+          <strong>{liveStatusLabel}</strong>
           <small>
             {lastUpdatedAt
               ? `Last updated ${dateLabel(lastUpdatedAt)}`
@@ -597,17 +655,36 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
         </article>
         <article>
           <span>Refresh cycle</span>
-          <strong>Every 30 seconds</strong>
-          <small>Useful for approvals, sales, repairs, and stock changes.</small>
+          <strong>
+            {!liveRefreshAvailable
+              ? "Not running"
+              : liveRefreshEnabled
+                ? `Every ${refreshCycleSeconds} seconds`
+                : "Paused"}
+          </strong>
+          <small>
+            {liveRefreshAvailable
+              ? "Manual refresh remains available when live updates are paused."
+              : "Sign in to the backend to follow live shop activity."}
+          </small>
         </article>
         <article>
           <span>Loaded sections</span>
           <strong>{integer(loadedSectionCount)} / 5</strong>
           <small>Visibility depends on this user&apos;s permissions.</small>
         </article>
-        <button className="secondary-button" disabled={isRefreshing} onClick={handleRefresh}>
-          {isRefreshing ? "Refreshing..." : "Refresh Now"}
-        </button>
+        <div className="dashboard-live-actions">
+          <button className="secondary-button" disabled={isRefreshing} onClick={handleRefresh}>
+            {isRefreshing ? "Refreshing..." : "Refresh Now"}
+          </button>
+          <button
+            className="secondary-button"
+            disabled={!liveRefreshAvailable}
+            onClick={handleToggleLiveRefresh}
+          >
+            {liveRefreshEnabled ? "Pause Live" : "Resume Live"}
+          </button>
+        </div>
       </section>
 
       <div className="stats-grid stats-grid--compact">

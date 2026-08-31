@@ -611,7 +611,7 @@ button:disabled {
 }
 
 .dashboard-live-strip article,
-.dashboard-live-strip button,
+.dashboard-live-actions,
 .dashboard-approval-strip button {
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -626,8 +626,17 @@ button:disabled {
   padding: 12px;
 }
 
-.dashboard-live-strip button {
+.dashboard-live-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  min-width: 170px;
+  padding: 8px;
+}
+
+.dashboard-live-actions button {
   min-width: 150px;
+  min-height: 38px;
   color: var(--text);
   font-weight: 800;
 }
@@ -4781,7 +4790,12 @@ button:disabled {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .dashboard-live-strip button {
+  .dashboard-live-actions {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-live-actions button {
     min-height: 52px;
   }
 
