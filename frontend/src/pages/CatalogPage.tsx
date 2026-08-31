@@ -62,6 +62,13 @@ type VariantForm = {
   minimum_selling_price: string;
 };
 
+type SkuSeed = {
+  item_name?: string;
+  model_type?: string;
+  capacity?: string;
+  color?: string;
+};
+
 const emptyCategoryForm = {
   name: "",
   slug: "",
@@ -298,7 +305,7 @@ function buildSkuFromParts(parts: Array<string | undefined | null>) {
     .slice(0, 72);
 }
 
-function accessorySkuPrefix(category?: Category, form?: ItemForm) {
+function accessorySkuPrefix(category?: Category, form?: SkuSeed) {
   const text = [
     category?.name,
     category?.slug,
@@ -325,6 +332,14 @@ function accessorySkuPrefix(category?: Category, form?: ItemForm) {
     return "AUD";
   }
   return "ACC";
+}
+
+function skuPrefix(kind: ItemKind, category?: Category, seed?: SkuSeed) {
+  if (kind === "phone") return "PHN";
+  if (kind === "laptop") return "LAP";
+  if (kind === "repair_part") return "PRT";
+  if (kind === "accessory") return accessorySkuPrefix(category, seed);
+  return "GEN";
 }
 
 function skuFormatHint(kind: ItemKind, category?: Category) {
@@ -393,6 +408,27 @@ function buildSku(
     brandName,
     form.item_name || form.model_type,
     form.capacity || form.storage || form.color,
+  ]);
+}
+
+function buildVariantSku(
+  product: CatalogProduct | undefined,
+  form: VariantForm,
+  brandName?: string,
+  kind: ItemKind = "general",
+  category?: Category,
+) {
+  if (form.sku.trim()) return skuPart(form.sku);
+
+  const productName = product?.name ?? "";
+  return buildSkuFromParts([
+    skuPrefix(kind, category, {
+      item_name: productName,
+      model_type: form.name,
+    }),
+    brandName,
+    productName,
+    form.name,
   ]);
 }
 
@@ -482,6 +518,15 @@ export function CatalogPage() {
     [selectedProduct, selectedVariantId],
   );
 
+  const selectedProductCategory = useMemo(
+    () => categories.find((category) => category.id === selectedProduct?.category_id),
+    [categories, selectedProduct?.category_id],
+  );
+  const selectedProductKind = categoryKind(selectedProductCategory);
+  const selectedProductBrandName = selectedProduct?.brand_id
+    ? brandById.get(selectedProduct.brand_id)
+    : undefined;
+
   const selectedVariantAttributes = useMemo(
     () => variantAttributeEntries(selectedVariant),
     [selectedVariant],
@@ -561,6 +606,14 @@ export function CatalogPage() {
   const draftImageUrl = itemForm.image_url.trim();
   const draftImageIsValid = isHttpUrl(draftImageUrl);
   const draftSkuAlreadyExists = skuExists(products, draftSku);
+  const variantDraftSku = buildVariantSku(
+    selectedProduct,
+    variantForm,
+    selectedProductBrandName,
+    selectedProductKind,
+    selectedProductCategory,
+  );
+  const variantDraftSkuAlreadyExists = Boolean(variantDraftSku) && skuExists(products, variantDraftSku);
 
   async function reloadProducts(preferredProductId?: string) {
     if (!token || isPreview) return;
@@ -1030,16 +1083,27 @@ export function CatalogPage() {
 
   async function handleCreateVariant(event: FormEvent) {
     event.preventDefault();
+    const generatedSku = buildVariantSku(
+      selectedProduct,
+      variantForm,
+      selectedProductBrandName,
+      selectedProductKind,
+      selectedProductCategory,
+    );
     if (!selectedProduct) {
       setNotice("Select an item before adding another option/SKU.");
       return;
     }
-    if (!variantForm.name.trim() || !variantForm.sku.trim()) {
-      setNotice("Option name and SKU are required.");
+    if (!variantForm.name.trim()) {
+      setNotice("Option name is required. The SKU can be auto-generated.");
       return;
     }
-    if (skuExists(products, variantForm.sku)) {
-      setNotice(`SKU ${variantForm.sku.trim().toUpperCase()} already exists. Use a unique SKU.`);
+    if (!generatedSku) {
+      setNotice("SKU could not be generated. Add a clearer option name or type a SKU manually.");
+      return;
+    }
+    if (skuExists(products, generatedSku)) {
+      setNotice(`SKU ${generatedSku} already exists. Use a unique SKU.`);
       return;
     }
     if (Number(variantForm.selling_price) <= 0) {
@@ -1061,7 +1125,7 @@ export function CatalogPage() {
           id: `preview-variant-${Date.now()}`,
           product_id: selectedProduct.id,
           name: variantForm.name.trim(),
-          sku: variantForm.sku.trim().toUpperCase(),
+          sku: generatedSku,
           barcode: variantForm.barcode || null,
           tracking_type: variantForm.tracking_type,
           attributes: {},
@@ -1081,7 +1145,7 @@ export function CatalogPage() {
 
       const variant = await createProductVariant(token, selectedProduct.id, {
         name: variantForm.name.trim(),
-        sku: variantForm.sku.trim().toUpperCase(),
+        sku: generatedSku,
         barcode: variantForm.barcode || null,
         tracking_type: variantForm.tracking_type,
         attributes: {},
@@ -1454,7 +1518,7 @@ export function CatalogPage() {
                     />
                   </label>
                   <label>
-                    Barcode
+                    Barcode optional
                     <input
                       value={itemForm.barcode}
                       onChange={(event) =>
@@ -1463,7 +1527,11 @@ export function CatalogPage() {
                           barcode: event.target.value,
                         }))
                       }
+                      placeholder="Leave empty if not scanning barcodes yet"
                     />
+                    <span className="field-help">
+                      Use this only if the supplier or manufacturer barcode is being scanned.
+                    </span>
                   </label>
                 </div>
               </div>
@@ -1630,7 +1698,7 @@ export function CatalogPage() {
                     />
                   </label>
                   <label>
-                    Barcode
+                    Barcode optional
                     <input
                       value={itemForm.barcode}
                       onChange={(event) =>
@@ -1639,7 +1707,11 @@ export function CatalogPage() {
                           barcode: event.target.value,
                         }))
                       }
+                      placeholder="Leave empty if not scanning barcodes yet"
                     />
+                    <span className="field-help">
+                      Use this only if the supplier or manufacturer barcode is being scanned.
+                    </span>
                   </label>
                 </div>
               </div>
@@ -2137,7 +2209,7 @@ export function CatalogPage() {
                         />
                       </label>
                       <label>
-                        SKU
+                        SKU optional override
                         <input
                           value={variantForm.sku}
                           onChange={(event) =>
@@ -2146,7 +2218,18 @@ export function CatalogPage() {
                               sku: event.target.value.toUpperCase(),
                             }))
                           }
+                          placeholder={variantDraftSku || "Auto-generated after option name"}
                         />
+                        <span className="field-help">
+                          Leave blank to auto-generate from the selected item and option name.
+                        </span>
+                        {variantDraftSku && (
+                          <StatusPill tone={variantDraftSkuAlreadyExists ? "danger" : "success"}>
+                            {variantDraftSkuAlreadyExists
+                              ? `SKU exists: ${variantDraftSku}`
+                              : `Generated: ${variantDraftSku}`}
+                          </StatusPill>
+                        )}
                       </label>
                       <label>
                         Tracking
@@ -2165,7 +2248,23 @@ export function CatalogPage() {
                         </select>
                       </label>
                       <label>
-                        Selling
+                        Barcode optional
+                        <input
+                          value={variantForm.barcode}
+                          onChange={(event) =>
+                            setVariantForm((current) => ({
+                              ...current,
+                              barcode: event.target.value,
+                            }))
+                          }
+                          placeholder="Leave empty if not scanning barcodes yet"
+                        />
+                        <span className="field-help">
+                          Supplier/manufacturer barcode only; not required for selling.
+                        </span>
+                      </label>
+                      <label>
+                        Selling price
                         <input
                           type="number"
                           min="0"
@@ -2226,7 +2325,7 @@ export function CatalogPage() {
                         />
                       </label>
                       <label>
-                        Barcode
+                        Barcode optional
                         <input
                           value={priceForm.barcode}
                           onChange={(event) =>
@@ -2235,7 +2334,11 @@ export function CatalogPage() {
                               barcode: event.target.value,
                             }))
                           }
+                          placeholder="Leave empty if not scanning barcodes yet"
                         />
+                        <span className="field-help">
+                          This is separate from the SKU and can stay blank.
+                        </span>
                       </label>
                       <label>
                         Status

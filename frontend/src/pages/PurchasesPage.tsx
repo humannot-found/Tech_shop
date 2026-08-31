@@ -221,10 +221,10 @@ function receiptIdentifierIssue(
 ) {
   if (!trackingType || !quantity || quantity <= 0) return null;
   if (duplicateIdentifier(serialNumbers)) {
-    return "Serial numbers cannot be repeated in the same receipt.";
+    return "Serial numbers cannot be repeated in the same stock receiving record.";
   }
   if (duplicateIdentifier(imeis, true)) {
-    return "IMEI numbers cannot be repeated in the same receipt.";
+    return "IMEI numbers cannot be repeated in the same stock receiving record.";
   }
   if (imeis.some((imei) => !/^\d{15}$/.test(imei))) {
     return "Every IMEI must contain exactly 15 digits.";
@@ -431,7 +431,7 @@ export function PurchasesPage() {
   );
   const receiptQuantityIssue = selectedReceiptItem
     ? !Number.isInteger(receiptQuantity) || receiptQuantity <= 0
-      ? "Enter a whole receipt quantity of at least 1."
+      ? "Enter a whole received quantity of at least 1."
       : receiptQuantity > selectedReceiptRemaining
         ? `Only ${integer(selectedReceiptRemaining)} unit(s) remain on this line.`
         : null
@@ -1034,7 +1034,7 @@ export function PurchasesPage() {
     const quantity = Number(receiptForm.quantity);
 
     if (!selectedItem) {
-      setNotice("Select an order item that still has stock awaiting receipt.");
+      setNotice("Select an order item that still has stock awaiting receiving.");
       return;
     }
     const remaining = selectedItem.ordered_quantity - selectedItem.received_quantity;
@@ -1044,7 +1044,7 @@ export function PurchasesPage() {
       quantity <= 0 ||
       quantity > remaining
     ) {
-      setNotice(`Receipt quantity must be between 1 and ${remaining}.`);
+      setNotice(`Received quantity must be between 1 and ${remaining}.`);
       return;
     }
     if (receiptBlockingIssue) {
@@ -1100,7 +1100,7 @@ export function PurchasesPage() {
         );
         setReceiptHistory((current) => [receipt, ...current]);
         setReceiptForm(emptyReceiptForm);
-        setNotice("Preview receipt posted locally and stock receipt progress updated.");
+        setNotice("Preview stock receiving posted locally and progress updated.");
         return;
       }
 
@@ -1206,7 +1206,7 @@ export function PurchasesPage() {
           <StatusPill tone="info">Total</StatusPill>
         </article>
         <article className="metric-card">
-          <span>Awaiting receipt</span>
+          <span>Awaiting stock receiving</span>
           <strong>{integer(awaiting)}</strong>
           <StatusPill tone="warning">Open</StatusPill>
         </article>
@@ -1390,7 +1390,7 @@ export function PurchasesPage() {
                     ? `${integer(currentLinePreview.units)} unit(s) at ${money(
                         purchaseFormUnitCost,
                       )}`
-                    : "Enter quantity and unit cost to preview value."}
+                    : "Enter quantity and cost per item to preview value."}
                 </small>
               </div>
               <StatusPill
@@ -1745,7 +1745,7 @@ export function PurchasesPage() {
                   </div>
                   <p className="purchase-action-note">
                     Stock receiving unlocks after approval. Draft orders stay out
-                    of inventory until a receipt is posted.
+                    of inventory until stock receiving is posted.
                   </p>
                 </div>
 
@@ -1774,8 +1774,8 @@ export function PurchasesPage() {
                         return (
                           <tr key={item.id}>
                             <td>
-                              <strong>{itemSkuLabel(item.variant_id)}</strong>
-                              <span>{money(item.unit_cost)} unit cost</span>
+                          <strong>{itemSkuLabel(item.variant_id)}</strong>
+                          <span>{money(item.unit_cost)} cost per item</span>
                             </td>
                             <td>{integer(item.ordered_quantity)}</td>
                             <td>{integer(item.received_quantity)}</td>
@@ -1795,7 +1795,7 @@ export function PurchasesPage() {
 
                 <form onSubmit={handleReceiveStock} className="action-form">
                   <label>
-                    Receive item
+                    Item / SKU to receive
                     <select
                       value={receiptForm.purchase_order_item_id}
                       onChange={(event) =>
@@ -1836,7 +1836,7 @@ export function PurchasesPage() {
                       {receivableItems.length === 0
                         ? "This purchase order no longer has pending quantities."
                         : selectedOrderCanReceive
-                          ? "Confirm quantity and identifiers, then post the receipt."
+                          ? "Confirm quantity and identifiers, then post the stock receiving record."
                           : "Submit and approve this purchase order before stock can enter inventory."}
                     </span>
                   </div>
@@ -1867,7 +1867,7 @@ export function PurchasesPage() {
                         </strong>
                       </div>
                       <div>
-                        <span>After receipt</span>
+                        <span>After this receiving</span>
                         <strong>
                           {receiptWillCompleteLine
                             ? "Complete"
@@ -1914,7 +1914,7 @@ export function PurchasesPage() {
                       />
                     </label>
                     <label>
-                      Delivery note
+                      Supplier delivery note
                       <input
                         value={receiptForm.supplier_delivery_note}
                         onChange={(event) =>
@@ -2022,7 +2022,7 @@ export function PurchasesPage() {
                   )}
 
                   <label>
-                    Receipt notes
+                    Receiving notes
                     <textarea
                       value={receiptForm.notes}
                       onChange={(event) =>
@@ -2049,8 +2049,8 @@ export function PurchasesPage() {
 
                 <div className="purchase-receipt-history">
                   <div className="purchase-line-progress__header">
-                    <strong>Receipt history</strong>
-                    <span>{integer(receiptHistory.length)} receipt(s)</span>
+                    <strong>Stock receiving history</strong>
+                    <span>{integer(receiptHistory.length)} receiving record(s)</span>
                   </div>
                   {receiptHistory.length ? (
                     <div className="receipt-history-list">
@@ -2059,7 +2059,7 @@ export function PurchasesPage() {
                           <div>
                             <strong>{receipt.receipt_number}</strong>
                             <span>
-                              {dateLabel(receipt.received_at)} · Delivery note{" "}
+                              {dateLabel(receipt.received_at)} · Supplier delivery note{" "}
                               {receipt.supplier_delivery_note || "-"}
                             </span>
                           </div>
@@ -2084,7 +2084,7 @@ export function PurchasesPage() {
                     </div>
                   ) : (
                     <p className="empty-panel-message">
-                      No receipts recorded for this purchase order yet.
+                      No stock receiving records have been posted for this purchase order yet.
                     </p>
                   )}
                 </div>

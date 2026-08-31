@@ -953,7 +953,7 @@ export function InventoryPage() {
           <h1>Inventory</h1>
           <p>
             Track stock levels, request corrections, transfer stock between
-            branches, and run controlled stock counts.
+            branches, and run simple physical stock checks.
           </p>
         </div>
         <label className="branch-selector">
@@ -1414,8 +1414,8 @@ export function InventoryPage() {
         <section className="panel-card">
           <header className="panel-card__header">
             <div>
-              <p className="eyebrow">Stocktake</p>
-              <h2>{selectedCount?.count_number ?? "Stock counts"}</h2>
+              <p className="eyebrow">Physical stock check</p>
+              <h2>{selectedCount?.count_number ?? "Count stock physically"}</h2>
             </div>
           </header>
 
@@ -1430,7 +1430,7 @@ export function InventoryPage() {
                 </div>
               )}
               <label>
-                Item to count
+                Item / SKU to count
                 <select
                   value={countForm.stock_balance_id}
                   onChange={(event) =>
@@ -1448,7 +1448,7 @@ export function InventoryPage() {
                 </select>
               </label>
               <label>
-                Stocktake notes
+                Count reason / notes
                 <textarea
                   value={countForm.notes}
                   onChange={(event) =>
@@ -1461,7 +1461,7 @@ export function InventoryPage() {
                 />
               </label>
               <button className="primary-button" disabled={busy}>
-                Start Stock Count
+                Start Physical Count
               </button>
             </form>
 
@@ -1477,7 +1477,7 @@ export function InventoryPage() {
 
                 <div className="inventory-count-summary">
                   <div>
-                    <span>Lines counted</span>
+                    <span>Lines checked</span>
                     <strong>
                       {integer(selectedCountSummary.countedLines)} /{" "}
                       {integer(selectedCountSummary.totalLines)}
@@ -1499,7 +1499,7 @@ export function InventoryPage() {
 
                 <form className="action-form" onSubmit={handleUpdateCountItem}>
                   <label>
-                    Count line
+                    Item / SKU counted
                     <select
                       value={countItemForm.item_id}
                       onChange={(event) => {
@@ -1537,7 +1537,7 @@ export function InventoryPage() {
                       />
                     </label>
                     <label>
-                      Count note
+                      Count note / reason
                       <input
                         value={countItemForm.notes}
                         onChange={(event) =>
@@ -1550,12 +1550,12 @@ export function InventoryPage() {
                     </label>
                   </div>
                   <button className="secondary-button" disabled={busy}>
-                    Save Counted Quantity
+                    Save Physical Count
                   </button>
                 </form>
 
                 <div className="action-form">
-                  <label>Stock count approval</label>
+                  <label>Count review</label>
                   <div className="table-actions">
                     <button
                       className="secondary-button"
@@ -1563,7 +1563,7 @@ export function InventoryPage() {
                       onClick={() => void handleCountAction("submit")}
                       type="button"
                     >
-                      Submit Count for Approval
+                      Submit Count for Review
                     </button>
                     <button
                       className="secondary-button"
@@ -1571,7 +1571,7 @@ export function InventoryPage() {
                       onClick={() => void handleCountAction("approve")}
                       type="button"
                     >
-                      Approve Stock Count
+                      Approve Count
                     </button>
                     <button
                       className="secondary-button"
@@ -1582,7 +1582,7 @@ export function InventoryPage() {
                       onClick={() => void handleCountAction("cancel")}
                       type="button"
                     >
-                      Cancel Stock Count
+                      Cancel Count
                     </button>
                   </div>
                 </div>
@@ -1816,8 +1816,8 @@ export function InventoryPage() {
         <section className="panel-card">
           <header className="panel-card__header">
             <div>
-              <p className="eyebrow">Stock counts</p>
-              <h2>Count sessions</h2>
+              <p className="eyebrow">Physical stock checks</p>
+              <h2>Count history</h2>
             </div>
           </header>
           <table className="data-table">
@@ -1857,7 +1857,7 @@ export function InventoryPage() {
               ) : (
                 <tr>
                   <td colSpan={5} className="empty-table-cell">
-                    No stock count sessions have been created for this branch yet.
+                    No physical stock checks have been created for this branch yet.
                   </td>
                 </tr>
               )}
@@ -1871,8 +1871,8 @@ export function InventoryPage() {
               <p className="eyebrow">Movements</p>
               <h2>
                 {movementScope === "all"
-                  ? "All recent stock movement"
-                  : "Selected item movement"}
+                  ? "All recent stock activity"
+                  : "Selected item stock activity"}
               </h2>
             </div>
             <StatusPill tone="neutral">
@@ -1885,7 +1885,7 @@ export function InventoryPage() {
                 <th>Date</th>
                 <th>Type</th>
                 <th>Qty</th>
-                <th>Unit cost</th>
+                <th>Cost per item</th>
                 <th>Reference</th>
               </tr>
             </thead>
