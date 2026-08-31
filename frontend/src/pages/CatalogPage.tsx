@@ -15,6 +15,7 @@ import {
 } from "../api/client";
 import type { Brand, CatalogProduct, Category, CatalogVariant } from "../api/types";
 import { StatusPill } from "../components/StatusPill";
+import { ToastNotice } from "../components/ToastNotice";
 import {
   demoBrands,
   demoCatalogProducts,
@@ -1291,7 +1292,7 @@ export function CatalogPage() {
         </label>
       </div>
 
-      {notice && <div className="notice notice--page">{notice}</div>}
+      <ToastNotice message={notice} onClose={() => setNotice(null)} />
 
       <div className="stats-grid stats-grid--compact">
         <article className="metric-card">

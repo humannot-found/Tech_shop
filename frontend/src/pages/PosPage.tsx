@@ -44,6 +44,7 @@ import type {
   TillSession,
 } from "../api/types";
 import { StatusPill } from "../components/StatusPill";
+import { ToastNotice } from "../components/ToastNotice";
 import { mockProducts } from "../data/mockProducts";
 import { useAuth } from "../state/auth";
 import { dateLabel } from "../utils/format";
@@ -1808,12 +1809,7 @@ export function PosPage({
           </StatusPill>
         </header>
 
-        {notice && (
-          <div className="notice notice--pos">
-            <span>{notice}</span>
-            <button onClick={() => setNotice(null)}>Dismiss</button>
-          </div>
-        )}
+        <ToastNotice message={notice} onClose={() => setNotice(null)} />
 
         {activeWorkspaceTab === "products" && (
           <section className="pos-products-view">

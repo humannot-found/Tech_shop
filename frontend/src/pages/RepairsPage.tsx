@@ -35,6 +35,7 @@ import type {
   StaffUser,
 } from "../api/types";
 import { StatusPill } from "../components/StatusPill";
+import { ToastNotice } from "../components/ToastNotice";
 import {
   demoBranches,
   demoCustomers,
@@ -1357,7 +1358,7 @@ export function RepairsPage({ onOpenRepairPayment }: RepairsPageProps) {
         </label>
       </div>
 
-      {notice && <div className="notice notice--page">{notice}</div>}
+      <ToastNotice message={notice} onClose={() => setNotice(null)} />
 
       <div className="stats-grid">
         <article className="metric-card">

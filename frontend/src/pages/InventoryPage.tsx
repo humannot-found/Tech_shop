@@ -31,6 +31,7 @@ import type {
   StockTransfer,
 } from "../api/types";
 import { StatusPill } from "../components/StatusPill";
+import { ToastNotice } from "../components/ToastNotice";
 import {
   demoAdjustmentRequests,
   demoBranches,
@@ -971,7 +972,7 @@ export function InventoryPage() {
         </label>
       </div>
 
-      {notice && <div className="notice notice--page">{notice}</div>}
+      <ToastNotice message={notice} onClose={() => setNotice(null)} />
 
       <section className="inventory-filter-bar">
         <label>

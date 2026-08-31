@@ -12,6 +12,7 @@ import {
 import type { CurrentUser, DashboardSummary, StatusTone, TillSession } from "../api/types";
 import { canAccessView, type AppView } from "../components/AppShell";
 import { StatusPill } from "../components/StatusPill";
+import { ToastNotice } from "../components/ToastNotice";
 import { demoDashboard } from "../data/demoManagement";
 import { useAuth } from "../state/auth";
 import { dateLabel, integer, money, titleize } from "../utils/format";
@@ -582,7 +583,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
         </div>
       </div>
 
-      {notice && <div className="notice notice--page">{notice}</div>}
+      <ToastNotice message={notice} onClose={() => setNotice(null)} />
 
       <section className="dashboard-live-strip">
         <article>

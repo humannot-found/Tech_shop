@@ -16,6 +16,7 @@ import type {
   StatusTone,
 } from "../api/types";
 import { StatusPill } from "../components/StatusPill";
+import { ToastNotice } from "../components/ToastNotice";
 import { demoBranches, demoDashboard } from "../data/demoManagement";
 import { useAuth } from "../state/auth";
 import { integer, money, titleize } from "../utils/format";
@@ -791,7 +792,7 @@ export function ReportsPage() {
         </article>
       </section>
 
-      {notice && <div className="notice notice--page">{notice}</div>}
+      <ToastNotice message={notice} onClose={() => setNotice(null)} />
 
       <section className="report-command-center">
         <article className="report-health-card">

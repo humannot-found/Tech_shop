@@ -19,6 +19,7 @@ import type {
   StaffUser,
 } from "../api/types";
 import { StatusPill } from "../components/StatusPill";
+import { ToastNotice } from "../components/ToastNotice";
 import { demoBranches, demoRoles, demoStaffUsers } from "../data/demoManagement";
 import { useAuth } from "../state/auth";
 import { dateLabel, integer, titleize, toneForStatus } from "../utils/format";
@@ -872,7 +873,7 @@ export function RoleStudioPage() {
         <StatusPill tone="info">Backend-enforced role assignment</StatusPill>
       </div>
 
-      {notice && <div className="notice notice--page">{notice}</div>}
+      <ToastNotice message={notice} onClose={() => setNotice(null)} />
 
       <div className="stats-grid">
         <article className="metric-card">

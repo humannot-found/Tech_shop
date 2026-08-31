@@ -20,6 +20,7 @@ import type {
   Supplier,
 } from "../api/types";
 import { StatusPill } from "../components/StatusPill";
+import { ToastNotice } from "../components/ToastNotice";
 import {
   demoBranches,
   demoPurchaseOrders,
@@ -1153,7 +1154,7 @@ export function PurchasesPage() {
         </label>
       </div>
 
-      {notice && <div className="notice notice--page">{notice}</div>}
+      <ToastNotice message={notice} onClose={() => setNotice(null)} />
 
       <section className="purchase-filter-bar">
         <label>

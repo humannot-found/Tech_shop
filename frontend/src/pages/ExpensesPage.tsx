@@ -11,6 +11,7 @@ import {
 } from "../api/client";
 import type { Branch, Expense, ExpenseCategory, ExpenseCreatePayload } from "../api/types";
 import { StatusPill } from "../components/StatusPill";
+import { ToastNotice } from "../components/ToastNotice";
 import {
   demoBranches,
   demoExpenseCategories,
@@ -580,7 +581,7 @@ export function ExpensesPage() {
         </StatusPill>
       </div>
 
-      {notice && <div className="notice notice--page">{notice}</div>}
+      <ToastNotice message={notice} onClose={() => setNotice(null)} />
 
       <div className="stats-grid">
         <article className="metric-card">
