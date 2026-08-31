@@ -1795,6 +1795,12 @@ export function PurchasesPage() {
                 </div>
 
                 <form onSubmit={handleReceiveStock} className="action-form">
+                  <p className="purchase-action-note">
+                    Use this section only when supplier items physically arrive.
+                    It records stock received into inventory, not a customer
+                    receipt.
+                  </p>
+
                   <label>
                     Item / SKU to receive
                     <select
@@ -1888,14 +1894,14 @@ export function PurchasesPage() {
                           }))
                         }
                       >
-                        Fill Remaining
+                        Fill remaining quantity
                       </button>
                     </div>
                   )}
 
                   <div className="form-grid form-grid--two">
                     <label>
-                      Quantity
+                      Quantity received
                       <input
                         type="number"
                         min="1"
@@ -2058,7 +2064,7 @@ export function PurchasesPage() {
                       {receiptHistory.map((receipt) => (
                         <article key={receipt.id}>
                           <div>
-                            <strong>{receipt.receipt_number}</strong>
+                            <strong>Receiving ref {receipt.receipt_number}</strong>
                             <span>
                               {dateLabel(receipt.received_at)} · Supplier delivery note{" "}
                               {receipt.supplier_delivery_note || "-"}

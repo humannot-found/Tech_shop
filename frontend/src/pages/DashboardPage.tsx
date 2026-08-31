@@ -288,7 +288,7 @@ function focusFor(user: CurrentUser | null, summary: DashboardSummary) {
   if (roleIs(user, "inventory_manager")) {
     return [
       ["Review low stock", `${integer(summary.inventory.low_stock_count)} item(s) are below reorder level.`, summary.inventory.low_stock_count ? "danger" : "success"],
-      ["Receive pending stock", "Purchase order receipts should update stock immediately.", "info"],
+      ["Receive pending stock", "Stock receiving should update inventory immediately.", "info"],
       ["Keep counts moving", "Counts and transfers explain branch quantity differences.", "neutral"],
     ] as const;
   }
