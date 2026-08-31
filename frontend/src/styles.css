@@ -24,26 +24,34 @@
   font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
 }
 
-:root[data-theme="theme-2"] {
-  --app-bg: #e7efe9;
+:root[data-theme="green-review"] {
+  --app-bg: #e8f0ea;
   --panel: #ffffff;
-  --panel-soft: #f5faf7;
-  --hero-soft: #eef8f1;
-  --line: #d5e2d9;
-  --line-strong: #b8cdbc;
-  --text: #1f352a;
-  --muted: #667b70;
-  --primary: #16835f;
-  --primary-dark: #116c4d;
-  --nav: #184d3a;
-  --blue: #16835f;
-  --success: #2fa46d;
-  --success-dark: #23885a;
+  --panel-soft: #f5faf6;
+  --hero-soft: #eef8f2;
+  --line: #d3e2d7;
+  --line-strong: #aac6b2;
+  --text: #183126;
+  --muted: #657a70;
+  --primary: #147a4f;
+  --primary-dark: #0d5f3c;
+  --nav: #0c3f2c;
+  --blue: #147a4f;
+  --success: #1d9a5d;
+  --success-dark: #127446;
   --danger: #c9252d;
-  --warning: #e7a42f;
-  --info: #138f7a;
-  --purple: #768f3d;
-  --shadow: 0 1px 2px rgba(31, 53, 42, 0.12);
+  --warning: #d99a2b;
+  --info: #138875;
+  --purple: #527d3a;
+  --shadow: 0 1px 2px rgba(24, 49, 38, 0.12);
+}
+
+:root[data-theme="green-review"] .erp-topbar {
+  background: linear-gradient(90deg, #0b3b29 0%, #147a4f 64%, #159665 100%);
+}
+
+:root[data-theme="green-review"] .brand-mark__gem {
+  background: #0f6d45;
 }
 
 * {
