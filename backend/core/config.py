@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     @property
     def mpesa_stk_callback_url(self) -> str:
         base_url = self.mpesa_callback_base_url.rstrip("/")
-        return f"{base_url}/api/v1/staff/pos/mpesa/callback"
+        return f"{base_url}/api/v1/mpesa/callback"
 
     model_config = SettingsConfigDict(
         env_file=".env", env_prefix="TECH_SHOP_", extra="ignore"

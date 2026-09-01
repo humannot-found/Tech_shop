@@ -361,6 +361,13 @@ def get_product_by_slug(
 
 
 def _normalise_phone(phone: str) -> str:
+    digits = "".join(character for character in phone if character.isdigit())
+    if digits.startswith("0") and len(digits) == 10:
+        return f"254{digits[1:]}"
+    if digits.startswith(("7", "1")) and len(digits) == 9:
+        return f"254{digits}"
+    if digits.startswith("254") and len(digits) in {12, 13}:
+        return digits
     return phone.strip().replace(" ", "")
 
 
@@ -477,9 +484,11 @@ def _get_or_create_customer(
 ) -> Customer:
     customer_payload = payload.customer
     phone = _normalise_phone(customer_payload.phone)
+    raw_phone = customer_payload.phone.strip().replace(" ", "")
+    phone_matches = {phone.lower(), raw_phone.lower()}
     customer = db.scalar(
         select(Customer).where(
-            func.lower(Customer.phone) == phone.lower(),
+            func.lower(Customer.phone).in_(phone_matches),
             Customer.is_deleted.is_(False),
         )
     )
@@ -723,4 +732,27 @@ def get_order(
     customer = db.get(Customer, sale.customer_id)
     if customer is None or _normalise_phone(customer.phone) != _normalise_phone(phone):
         raise NotFoundError("order not found")
+    return _order_response(db, sale)
+
+
+def get_order_model_for_customer(
+    db: Session, *, order_number: str, phone: str, lock: bool = False
+) -> tuple[Sale, Customer]:
+    statement = select(Sale).where(
+        func.upper(Sale.invoice_number) == order_number.strip().upper(),
+        Sale.channel == SaleChannel.ONLINE,
+        Sale.is_deleted.is_(False),
+    )
+    if lock:
+        statement = statement.with_for_update()
+    sale = db.scalar(statement)
+    if sale is None or sale.customer_id is None:
+        raise NotFoundError("order not found")
+    customer = db.get(Customer, sale.customer_id)
+    if customer is None or _normalise_phone(customer.phone) != _normalise_phone(phone):
+        raise NotFoundError("order not found")
+    return sale, customer
+
+
+def order_response_for_sale(db: Session, sale: Sale) -> StorefrontOrderResponse:
     return _order_response(db, sale)

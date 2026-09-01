@@ -7,10 +7,14 @@ from backend.schemas.base_schemas import Page
 from backend.schemas.storefront_schemas import (
     StorefrontBrandResponse,
     StorefrontCategoryResponse,
+    StorefrontMpesaPaymentStatusResponse,
+    StorefrontMpesaStkPushCreate,
+    StorefrontMpesaStkPushResponse,
     StorefrontOrderCreate,
     StorefrontOrderResponse,
     StorefrontProductResponse,
 )
+from backend.services import mpesa as mpesa_service
 from backend.services import storefront as storefront_service
 
 router = APIRouter(prefix="/storefront", tags=["storefront"])
@@ -91,3 +95,41 @@ def get_order(
     phone: str = Query(..., min_length=7, max_length=20),
 ) -> StorefrontOrderResponse:
     return storefront_service.get_order(db, order_number=order_number, phone=phone)
+
+
+@router.post(
+    "/orders/{order_number}/mpesa/stk-push",
+    response_model=StorefrontMpesaStkPushResponse,
+)
+def send_order_mpesa_stk_push(
+    order_number: str,
+    payload: StorefrontMpesaStkPushCreate,
+    db: DatabaseSession,
+    phone: str = Query(..., min_length=7, max_length=20),
+) -> StorefrontMpesaStkPushResponse:
+    item = mpesa_service.initiate_storefront_order_stk_push(
+        db,
+        order_number=order_number,
+        phone=phone,
+        payload=payload,
+    )
+    db.commit()
+    return item
+
+
+@router.get(
+    "/orders/{order_number}/mpesa/status",
+    response_model=StorefrontMpesaPaymentStatusResponse,
+)
+def get_order_mpesa_status(
+    order_number: str,
+    db: DatabaseSession,
+    phone: str = Query(..., min_length=7, max_length=20),
+    checkout_request_id: str | None = Query(default=None, min_length=3, max_length=150),
+) -> StorefrontMpesaPaymentStatusResponse:
+    return mpesa_service.storefront_order_mpesa_status(
+        db,
+        order_number=order_number,
+        phone=phone,
+        checkout_request_id=checkout_request_id,
+    )

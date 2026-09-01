@@ -1,9 +1,10 @@
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
 from pydantic import EmailStr, Field, model_validator
 
-from backend.models.enums import FulfillmentStatus, SaleStatus
+from backend.models.enums import FulfillmentStatus, PaymentStatus, SaleStatus
 from backend.models.enums import TrackingType
 from backend.schemas.base_schemas import BaseSchema
 
@@ -119,3 +120,32 @@ class StorefrontOrderResponse(BaseSchema):
     balance_due: Decimal
     notes: str | None
     items: list[StorefrontOrderItemResponse]
+
+
+class StorefrontMpesaStkPushCreate(BaseSchema):
+    phone_number: str | None = Field(default=None, min_length=9, max_length=15)
+    idempotency_key: str = Field(min_length=8, max_length=150)
+    notes: str | None = Field(default=None, max_length=500)
+
+
+class StorefrontMpesaStkPushResponse(BaseSchema):
+    order: StorefrontOrderResponse
+    payment_id: UUID
+    payment_status: PaymentStatus
+    amount: Decimal
+    checkout_request_id: str
+    merchant_request_id: str
+    customer_message: str
+
+
+class StorefrontMpesaPaymentStatusResponse(BaseSchema):
+    order: StorefrontOrderResponse
+    payment_id: UUID
+    payment_status: PaymentStatus
+    amount: Decimal
+    checkout_request_id: str
+    provider_reference: str | None
+    paid_at: datetime | None
+    result_code: int | None
+    result_description: str | None
+    customer_message: str

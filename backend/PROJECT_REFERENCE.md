@@ -79,9 +79,9 @@ Seeded records include:
 ## Current project track
 
 The internal management system is the first priority. The public website backend API has
-started with safe catalog browsing and online order intake, while deployment, permanent
-image storage, and full visual redesign remain deliberately parked until the client has
-reviewed the operating system module by module.
+started with safe catalog browsing, online order intake, and M-Pesa payment automation,
+while deployment, permanent image storage, and full visual redesign remain deliberately
+parked until the client has reviewed the operating system module by module.
 
 Completed/active internal upgrades:
 
@@ -135,8 +135,9 @@ Routers should not contain business logic. If a rule matters, put it in a servic
 | `backend/api/__init__.py` | API package marker |
 | `backend/api/dependencies.py` | DB session, bearer auth, permission dependency helpers |
 | `backend/api/errors.py` | Converts service exceptions to HTTP responses |
-| `backend/api/v1/__init__.py` | Adds the `/api/v1` prefix and mounts staff plus storefront routes |
+| `backend/api/v1/__init__.py` | Adds the `/api/v1` prefix and mounts staff, storefront, and shared M-Pesa routes |
 | `backend/api/v1/routers/__init__.py` | Registers every staff router |
+| `backend/api/v1/routers/mpesa.py` | Shared unauthenticated M-Pesa callback endpoint |
 
 ### Routers
 
@@ -201,7 +202,7 @@ Routers should not contain business logic. If a rule matters, put it in a servic
 | `backend/schemas/branch_schemas.py` | Branch create/update/response |
 | `backend/schemas/user_schemas.py` | Staff user, role, permission schemas |
 | `backend/schemas/products_schemas.py` | Catalog categories, brands, products, variants, images, import |
-| `backend/schemas/storefront_schemas.py` | Public website catalog/order contracts without internal cost, serial, or IMEI fields |
+| `backend/schemas/storefront_schemas.py` | Public website catalog, order, and M-Pesa contracts without internal cost, serial, or IMEI fields |
 | `backend/schemas/supplier_schemas.py` | Supplier create/update/response |
 | `backend/schemas/purchase_schemas.py` | Purchase orders and goods receipts |
 | `backend/schemas/inventory_schemas.py` | Balances, units, movements, adjustments, transfers |
@@ -296,6 +297,8 @@ Public website API endpoints are prefixed with:
 
 These routes do not require staff authentication. They expose only active/published
 catalog data, safe stock availability counts, and customer-safe online order tracking.
+The shared M-Pesa callback lives at `/api/v1/mpesa/callback` and is intentionally hidden
+from Swagger/OpenAPI because Safaricom calls it directly.
 
 ### Storefront
 
@@ -307,6 +310,8 @@ catalog data, safe stock availability counts, and customer-safe online order tra
 | GET | `/products/{slug}` | `slug` path, `branch_id` query | - | Gets one active published website product by slug |
 | POST | `/orders` | - | `StorefrontOrderCreate` | Creates/reuses a customer, creates a pending online order, and reserves stock for 24 hours |
 | GET | `/orders/{order_number}` | `order_number` path, `phone` query | - | Lets a customer track their own online order without staff login |
+| POST | `/orders/{order_number}/mpesa/stk-push` | `order_number` path, `phone` query | `StorefrontMpesaStkPushCreate` | Sends a website order M-Pesa prompt for the outstanding order balance |
+| GET | `/orders/{order_number}/mpesa/status` | `order_number` path, `phone`, `checkout_request_id` query | - | Lets the website poll current M-Pesa/payment status after an STK prompt |
 
 All staff API endpoints are prefixed with:
 

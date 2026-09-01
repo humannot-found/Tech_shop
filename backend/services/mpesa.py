@@ -13,6 +13,7 @@ from backend.models.enums import (
     PaymentDirection,
     PaymentMethod,
     PaymentStatus,
+    SaleChannel,
     SaleStatus,
 )
 from backend.models.payments import Payment
@@ -26,8 +27,15 @@ from backend.schemas.payments_schemas import (
     MpesaStkPushResponse,
     PaymentResponse,
 )
+from backend.schemas.storefront_schemas import (
+    StorefrontMpesaPaymentStatusResponse,
+    StorefrontMpesaStkPushCreate,
+    StorefrontMpesaStkPushResponse,
+)
 from backend.services import repair_billing
 from backend.services import sales
+from backend.services import storefront
+from backend.services import online_orders
 from backend.services.audit import record_audit
 from backend.services.auth import AuthPrincipal
 from backend.services.exceptions import ConflictError, NotFoundError, ValidationError
@@ -403,6 +411,178 @@ def initiate_repair_stk_push(
     )
 
 
+def _storefront_stk_response(
+    db: Session,
+    sale: Sale,
+    payment: Payment,
+    *,
+    customer_message: str,
+    merchant_request_id: str | None = None,
+) -> StorefrontMpesaStkPushResponse:
+    provider_payload = payment.provider_payload or {}
+    checkout_request_id = _checkout_request_id(payment)
+    return StorefrontMpesaStkPushResponse(
+        order=storefront.order_response_for_sale(db, sale),
+        payment_id=payment.id,
+        payment_status=payment.status,
+        amount=payment.amount,
+        checkout_request_id=checkout_request_id,
+        merchant_request_id=str(
+            merchant_request_id or provider_payload.get("merchant_request_id") or ""
+        ),
+        customer_message=customer_message,
+    )
+
+
+def initiate_storefront_order_stk_push(
+    db: Session,
+    *,
+    order_number: str,
+    phone: str,
+    payload: StorefrontMpesaStkPushCreate,
+) -> StorefrontMpesaStkPushResponse:
+    sale, customer = storefront.get_order_model_for_customer(
+        db, order_number=order_number, phone=phone, lock=True
+    )
+    if sale.status == SaleStatus.PAID:
+        raise ConflictError("online order is already paid")
+    if sale.status != SaleStatus.PENDING_PAYMENT:
+        raise ConflictError("this online order is not awaiting payment")
+
+    existing = db.scalar(
+        select(Payment).where(Payment.idempotency_key == payload.idempotency_key)
+    )
+    if existing is not None:
+        if existing.sale_id != sale.id:
+            raise ConflictError("payment idempotency key is already in use")
+        return _storefront_stk_response(
+            db,
+            sale,
+            existing,
+            customer_message=str(
+                (existing.provider_payload or {}).get("customer_message")
+                or "M-Pesa prompt already sent."
+            ),
+        )
+
+    pending_mpesa = db.scalar(
+        select(Payment.id).where(
+            Payment.sale_id == sale.id,
+            Payment.method == PaymentMethod.MPESA,
+            Payment.status == PaymentStatus.PENDING,
+            Payment.is_deleted.is_(False),
+        )
+    )
+    if pending_mpesa is not None:
+        raise ConflictError(
+            "a M-Pesa prompt is already pending for this order; check its status "
+            "or wait for the callback before retrying"
+        )
+
+    amount = sales.money(sale.total_amount - sale.paid_amount)
+    if amount <= 0:
+        raise ConflictError("online order is already paid")
+
+    phone_number = _normalize_phone(payload.phone_number or customer.phone)
+    account_reference = _account_reference(sale.invoice_number)
+    shortcode = settings.mpesa_shortcode.strip()
+    passkey = _configured_value(settings.mpesa_passkey, "passkey")
+    timestamp = _timestamp()
+    request_payload = {
+        "BusinessShortCode": shortcode,
+        "Password": _password(shortcode, passkey, timestamp),
+        "Timestamp": timestamp,
+        "TransactionType": settings.mpesa_transaction_type,
+        "Amount": _mpesa_amount(amount),
+        "PartyA": phone_number,
+        "PartyB": shortcode,
+        "PhoneNumber": phone_number,
+        "CallBackURL": settings.mpesa_stk_callback_url,
+        "AccountReference": account_reference,
+        "TransactionDesc": payload.notes or f"Website order {sale.invoice_number}",
+    }
+
+    try:
+        response = httpx.post(
+            f"{settings.mpesa_base_url}/mpesa/stkpush/v1/processrequest",
+            headers={"Authorization": f"Bearer {_access_token()}"},
+            json=request_payload,
+            timeout=30,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise ValidationError("could not send M-Pesa STK Push prompt") from exc
+
+    response_payload = response.json()
+    response_code = str(response_payload.get("ResponseCode", ""))
+    if response_code != "0":
+        message = (
+            response_payload.get("errorMessage")
+            or response_payload.get("ResponseDescription")
+            or "M-Pesa rejected the STK Push request"
+        )
+        raise ValidationError(str(message))
+
+    checkout_request_id = str(response_payload.get("CheckoutRequestID") or "")
+    merchant_request_id = str(response_payload.get("MerchantRequestID") or "")
+    customer_message = str(
+        response_payload.get("CustomerMessage")
+        or "M-Pesa prompt sent. Enter your PIN to pay for the order."
+    )
+    if not checkout_request_id:
+        raise ValidationError("M-Pesa response did not include a checkout request id")
+
+    payment = Payment(
+        branch_id=sale.branch_id,
+        sale_id=sale.id,
+        till_session_id=None,
+        direction=PaymentDirection.INCOMING,
+        method=PaymentMethod.MPESA,
+        status=PaymentStatus.PENDING,
+        amount=amount,
+        currency="KES",
+        provider_reference=checkout_request_id,
+        payer_phone=phone_number,
+        payer_name=customer.full_name,
+        payer_account_reference=account_reference,
+        idempotency_key=payload.idempotency_key,
+        provider_payload={
+            "source": "storefront",
+            "merchant_request_id": merchant_request_id,
+            "checkout_request_id": checkout_request_id,
+            "customer_message": customer_message,
+            "phone_number": phone_number,
+            "account_reference": account_reference,
+            "amount": str(amount),
+            "callback_url": settings.mpesa_stk_callback_url,
+            "response": response_payload,
+        },
+        notes=payload.notes,
+    )
+    db.add(payment)
+    db.flush()
+    record_audit(
+        db,
+        actor_id=None,
+        branch_id=sale.branch_id,
+        action="mpesa.storefront_stk_push_sent",
+        resource_type="payment",
+        resource_id=payment.id,
+        after={
+            "order_number": sale.invoice_number,
+            "checkout_request_id": checkout_request_id,
+            "amount": str(amount),
+        },
+    )
+    return _storefront_stk_response(
+        db,
+        sale,
+        payment,
+        merchant_request_id=merchant_request_id,
+        customer_message=customer_message,
+    )
+
+
 def _callback_metadata(callback: dict) -> dict[str, object]:
     items = callback.get("CallbackMetadata", {}).get("Item", [])
     return {
@@ -551,6 +731,107 @@ def _checkout_request_id(payment: Payment) -> str:
     )
 
 
+def _payment_result_code(payment: Payment) -> int | None:
+    provider_payload = payment.provider_payload or {}
+    return _result_code(
+        provider_payload.get("result_code")
+        or provider_payload.get("stk_query_result_code")
+    )
+
+
+def _payment_result_description(payment: Payment) -> str | None:
+    provider_payload = payment.provider_payload or {}
+    value = (
+        provider_payload.get("result_description")
+        or provider_payload.get("stk_query_result_description")
+    )
+    return str(value) if value else None
+
+
+def _storefront_status_message(payment: Payment) -> str:
+    if payment.status == PaymentStatus.COMPLETED:
+        return "M-Pesa payment confirmed. The shop will prepare your order."
+    if payment.status == PaymentStatus.PENDING:
+        return "M-Pesa is still processing this prompt."
+    if payment.status == PaymentStatus.CANCELLED:
+        return "M-Pesa prompt was cancelled. You can retry payment."
+    if payment.status == PaymentStatus.FAILED:
+        return "M-Pesa prompt failed. You can retry or choose another payment method."
+    return f"M-Pesa payment is {payment.status.value}."
+
+
+def storefront_order_mpesa_status(
+    db: Session,
+    *,
+    order_number: str,
+    phone: str,
+    checkout_request_id: str | None = None,
+) -> StorefrontMpesaPaymentStatusResponse:
+    sale, _ = storefront.get_order_model_for_customer(
+        db, order_number=order_number, phone=phone
+    )
+    conditions = [
+        Payment.sale_id == sale.id,
+        Payment.method == PaymentMethod.MPESA,
+        Payment.is_deleted.is_(False),
+    ]
+    if checkout_request_id:
+        clean_checkout_id = checkout_request_id.strip()
+        conditions.append(
+            or_(
+                Payment.provider_reference == clean_checkout_id,
+                Payment.provider_payload["checkout_request_id"].as_string()
+                == clean_checkout_id,
+            )
+        )
+    payment = db.scalar(
+        select(Payment)
+        .where(*conditions)
+        .order_by(Payment.created_at.desc())
+        .limit(1)
+    )
+    if payment is None:
+        raise NotFoundError("M-Pesa payment not found for this order")
+    return StorefrontMpesaPaymentStatusResponse(
+        order=storefront.order_response_for_sale(db, sale),
+        payment_id=payment.id,
+        payment_status=payment.status,
+        amount=payment.amount,
+        checkout_request_id=_checkout_request_id(payment),
+        provider_reference=payment.provider_reference,
+        paid_at=payment.paid_at,
+        result_code=_payment_result_code(payment),
+        result_description=_payment_result_description(payment),
+        customer_message=_storefront_status_message(payment),
+    )
+
+
+def _complete_sale_mpesa_payment(
+    db: Session,
+    sale: Sale,
+    payment: Payment,
+    *,
+    provider_reference: str | None,
+    provider_payload: dict | None,
+    paid_at: datetime | None = None,
+) -> PaymentResponse:
+    if sale.channel == SaleChannel.ONLINE:
+        return online_orders.complete_pending_payment(
+            db,
+            payment,
+            provider_reference=provider_reference,
+            provider_payload=provider_payload,
+            paid_at=paid_at,
+        )
+    return sales.complete_pending_payment(
+        db,
+        payment,
+        provider_reference=provider_reference,
+        provider_payload=provider_payload,
+        paid_at=paid_at,
+    )
+
+
 def query_sale_stk_payment(
     db: Session,
     principal: AuthPrincipal,
@@ -644,8 +925,9 @@ def query_sale_stk_payment(
 
     if result_code == 0:
         if sale is not None:
-            completed = sales.complete_pending_payment(
+            completed = _complete_sale_mpesa_payment(
                 db,
+                sale,
                 payment,
                 provider_reference=payment.provider_reference,
                 provider_payload=provider_payload,
@@ -838,8 +1120,9 @@ def handle_stk_callback(db: Session, payload: dict) -> dict[str, object]:
             }
 
     if sale is not None:
-        completed = sales.complete_pending_payment(
+        completed = _complete_sale_mpesa_payment(
             db,
+            sale,
             payment,
             provider_reference=receipt_number,
             provider_payload=provider_payload,

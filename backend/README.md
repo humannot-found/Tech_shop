@@ -132,7 +132,8 @@ M-Pesa STK Push uses Daraja credentials from `.env`: `TECH_SHOP_MPESA_CONSUMER_K
 `TECH_SHOP_MPESA_CONSUMER_SECRET`, `TECH_SHOP_MPESA_PASSKEY`,
 `TECH_SHOP_MPESA_SHORTCODE`, and `TECH_SHOP_MPESA_CALLBACK_BASE_URL`. The callback base
 URL must be a public backend URL that Safaricom can reach; localhost callbacks will not
-complete live prompts.
+complete live prompts. The backend builds the callback URL as `/api/v1/mpesa/callback`.
+This single callback handler completes POS, repair, and website order M-Pesa payments.
 
 Unpaid sales can be cancelled by their cashier. Paid voids and product returns are
 request-and-approve workflows: Cashiers initiate them, while an Admin or Branch Manager
@@ -174,7 +175,7 @@ sale voids, and returns. Reports are calculated from live operational records ra
 stored totals, remain branch-scoped for non-Admin staff, and allow technicians to view
 only their own assigned repair report scope.
 
-The next implementation slice is storefront payment automation: connecting website
-checkout to online M-Pesa/card flows so confirmed provider callbacks can move website
-orders from pending payment into the staff fulfillment queue automatically. Deployment,
+The next implementation slice is frontend integration for online orders: the Vue website
+can call the public catalog, checkout, M-Pesa prompt, and payment-status endpoints, while
+the staff frontend can add an online-order queue for packing and fulfillment. Deployment,
 permanent image storage, and full redesign work remain parked for later client review.

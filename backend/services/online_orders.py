@@ -344,6 +344,98 @@ def record_payment(
     return _order_response(db, sale)
 
 
+def complete_pending_payment(
+    db: Session,
+    payment: Payment,
+    *,
+    provider_reference: str | None,
+    provider_payload: dict | None,
+    paid_at: datetime | None = None,
+) -> PaymentResponse:
+    if payment.sale_id is None:
+        raise ConflictError("payment is not linked to an online order")
+    sale = db.scalar(
+        select(Sale)
+        .where(
+            Sale.id == payment.sale_id,
+            Sale.channel == SaleChannel.ONLINE,
+            Sale.is_deleted.is_(False),
+        )
+        .with_for_update()
+    )
+    if sale is None:
+        raise NotFoundError("online order not found")
+    if provider_reference and provider_reference != payment.provider_reference:
+        duplicate = db.scalar(
+            select(Payment.id).where(
+                Payment.provider_reference == provider_reference,
+                Payment.id != payment.id,
+                Payment.is_deleted.is_(False),
+            )
+        )
+        if duplicate is not None:
+            raise ConflictError("payment provider reference is already in use")
+
+    if payment.status == PaymentStatus.COMPLETED:
+        payment.provider_reference = provider_reference or payment.provider_reference
+        payment.provider_payload = {
+            **(payment.provider_payload or {}),
+            **(provider_payload or {}),
+        }
+        if paid_at and payment.paid_at is None:
+            payment.paid_at = paid_at
+        db.flush()
+        return PaymentResponse.model_validate(payment)
+    if payment.status != PaymentStatus.PENDING:
+        raise ConflictError("only pending payments can be completed")
+    if sale.status not in {SaleStatus.PENDING_PAYMENT, SaleStatus.PAID}:
+        raise ConflictError("online order is not awaiting payment")
+
+    outstanding = money(sale.total_amount - sale.paid_amount)
+    if payment.amount > outstanding:
+        raise ValidationError("payment exceeds the outstanding order amount")
+
+    now = paid_at or datetime.now(timezone.utc)
+    payment.status = PaymentStatus.COMPLETED
+    payment.provider_reference = provider_reference or payment.provider_reference
+    payment.provider_payload = {
+        **(payment.provider_payload or {}),
+        **(provider_payload or {}),
+    }
+    if provider_payload:
+        if not payment.payer_phone and provider_payload.get("phone_number"):
+            payment.payer_phone = str(provider_payload["phone_number"])
+        if (
+            not payment.payer_account_reference
+            and provider_payload.get("account_reference")
+        ):
+            payment.payer_account_reference = str(
+                provider_payload["account_reference"]
+            )
+    payment.paid_at = now
+    sale.paid_amount = money(sale.paid_amount + payment.amount)
+    if sale.paid_amount > sale.total_amount:
+        raise ValidationError("payment exceeds the outstanding order amount")
+    if sale.paid_amount == sale.total_amount:
+        sale.status = SaleStatus.PAID
+
+    db.flush()
+    record_audit(
+        db,
+        actor_id=None,
+        branch_id=sale.branch_id,
+        action="online_order.payment_confirmed",
+        resource_type="sale",
+        resource_id=sale.id,
+        after={
+            "payment_id": str(payment.id),
+            "paid_amount": str(sale.paid_amount),
+            "status": sale.status.value,
+        },
+    )
+    return PaymentResponse.model_validate(payment)
+
+
 def _available_serialized_unit(
     db: Session,
     *,
