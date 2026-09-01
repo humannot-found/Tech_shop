@@ -9,7 +9,7 @@ from backend.models.audit import AuditLog
 def record_audit(
     db: Session,
     *,
-    actor_id: UUID,
+    actor_id: UUID | None,
     branch_id: UUID | None,
     action: str,
     resource_type: str,

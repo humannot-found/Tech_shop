@@ -77,9 +77,10 @@ Seeded records include:
 
 ## Current project track
 
-We are finishing the internal management system first. The public website, deployment,
-permanent image storage, and full visual redesign are deliberately parked until the
-client has reviewed the operating system module by module.
+The internal management system is the first priority. The public website backend API has
+started with safe catalog browsing and online order intake, while deployment, permanent
+image storage, and full visual redesign remain deliberately parked until the client has
+reviewed the operating system module by module.
 
 Completed/active internal upgrades:
 
@@ -100,7 +101,7 @@ Still useful internal improvements:
 
 Parked improvements:
 
-- Customer-facing website.
+- Website frontend polish and final content.
 - Vercel/production deployment flow.
 - Cloudinary or other permanent product image storage.
 - Full redesign/theme exploration beyond small usability adjustments.
@@ -150,7 +151,7 @@ Routers should not contain business logic. If a rule matters, put it in a servic
 | `backend/api/v1/routers/repairs.py` | Repair booking, intake, assignment, diagnosis, parts, billing |
 | `backend/api/v1/routers/expenses.py` | Expense categories and expense approval workflow |
 | `backend/api/v1/routers/reports.py` | Dashboard, sales, inventory, repair, expense summaries |
-| `backend/api/v1/routers/storefront.py` | Public website catalog: categories, brands, products, safe availability |
+| `backend/api/v1/routers/storefront.py` | Public website catalog and order intake/tracking |
 
 ### Core
 
@@ -198,7 +199,7 @@ Routers should not contain business logic. If a rule matters, put it in a servic
 | `backend/schemas/branch_schemas.py` | Branch create/update/response |
 | `backend/schemas/user_schemas.py` | Staff user, role, permission schemas |
 | `backend/schemas/products_schemas.py` | Catalog categories, brands, products, variants, images, import |
-| `backend/schemas/storefront_schemas.py` | Public website catalog responses without internal pricing/cost fields |
+| `backend/schemas/storefront_schemas.py` | Public website catalog/order contracts without internal cost, serial, or IMEI fields |
 | `backend/schemas/supplier_schemas.py` | Supplier create/update/response |
 | `backend/schemas/purchase_schemas.py` | Purchase orders and goods receipts |
 | `backend/schemas/inventory_schemas.py` | Balances, units, movements, adjustments, transfers |
@@ -228,7 +229,7 @@ Routers should not contain business logic. If a rule matters, put it in a servic
 | `backend/services/staff.py` | Staff management and assignment limits |
 | `backend/services/catalog.py` | Catalog CRUD/publication rules |
 | `backend/services/catalog_import.py` | CSV catalog import validation/import |
-| `backend/services/storefront.py` | Public catalog listing/detail logic with safe stock availability counts |
+| `backend/services/storefront.py` | Public catalog listing/detail and online order reservation logic |
 | `backend/services/suppliers.py` | Supplier CRUD |
 | `backend/services/purchasing.py` | Purchase order workflow and receiving |
 | `backend/services/inventory.py` | Central stock ledger operations |
@@ -290,7 +291,7 @@ Public website API endpoints are prefixed with:
 ```
 
 These routes do not require staff authentication. They expose only active/published
-catalog data and safe stock availability counts.
+catalog data, safe stock availability counts, and customer-safe online order tracking.
 
 ### Storefront
 
@@ -300,6 +301,8 @@ catalog data and safe stock availability counts.
 | GET | `/brands` | - | - | Lists active brands with published product counts |
 | GET | `/products` | `page`, `page_size`, `q`, `category`, `brand_id`, `branch_id`, `in_stock_only` query | - | Lists active published website products and safe availability |
 | GET | `/products/{slug}` | `slug` path, `branch_id` query | - | Gets one active published website product by slug |
+| POST | `/orders` | - | `StorefrontOrderCreate` | Creates/reuses a customer, creates a pending online order, and reserves stock for 24 hours |
+| GET | `/orders/{order_number}` | `order_number` path, `phone` query | - | Lets a customer track their own online order without staff login |
 
 All staff API endpoints are prefixed with:
 

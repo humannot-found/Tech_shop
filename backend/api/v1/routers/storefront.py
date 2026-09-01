@@ -1,12 +1,14 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, status
 
 from backend.api.dependencies import DatabaseSession
 from backend.schemas.base_schemas import Page
 from backend.schemas.storefront_schemas import (
     StorefrontBrandResponse,
     StorefrontCategoryResponse,
+    StorefrontOrderCreate,
+    StorefrontOrderResponse,
     StorefrontProductResponse,
 )
 from backend.services import storefront as storefront_service
@@ -66,3 +68,26 @@ def get_product(
     branch_id: UUID | None = None,
 ) -> StorefrontProductResponse:
     return storefront_service.get_product_by_slug(db, slug, branch_id=branch_id)
+
+
+@router.post(
+    "/orders",
+    response_model=StorefrontOrderResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_order(
+    payload: StorefrontOrderCreate,
+    db: DatabaseSession,
+) -> StorefrontOrderResponse:
+    order = storefront_service.create_order(db, payload)
+    db.commit()
+    return order
+
+
+@router.get("/orders/{order_number}", response_model=StorefrontOrderResponse)
+def get_order(
+    order_number: str,
+    db: DatabaseSession,
+    phone: str = Query(..., min_length=7, max_length=20),
+) -> StorefrontOrderResponse:
+    return storefront_service.get_order(db, order_number=order_number, phone=phone)
