@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from backend.api.errors import register_error_handlers
-from backend.api.v1 import router as staff_router
+from backend.api.v1 import router as api_v1_router
 from backend.core.config import settings
 from backend.models.database import SessionLocal
 
@@ -17,7 +17,7 @@ if settings.cors_origin_list:
         allow_headers=["*"],
     )
 register_error_handlers(app)
-app.include_router(staff_router)
+app.include_router(api_v1_router)
 
 
 @app.get("/health", tags=["system"])

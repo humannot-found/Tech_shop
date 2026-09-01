@@ -129,11 +129,11 @@ Routers should not contain business logic. If a rule matters, put it in a servic
 | File | Purpose |
 | --- | --- |
 | `backend/__init__.py` | Marks `backend` as an importable package |
-| `backend/main.py` | Builds the FastAPI app, configures CORS, exposes health checks, and mounts `/api/v1/staff` |
+| `backend/main.py` | Builds the FastAPI app, configures CORS, exposes health checks, and mounts `/api/v1` |
 | `backend/api/__init__.py` | API package marker |
 | `backend/api/dependencies.py` | DB session, bearer auth, permission dependency helpers |
 | `backend/api/errors.py` | Converts service exceptions to HTTP responses |
-| `backend/api/v1/__init__.py` | Adds the `/api/v1/staff` prefix |
+| `backend/api/v1/__init__.py` | Adds the `/api/v1` prefix and mounts staff plus storefront routes |
 | `backend/api/v1/routers/__init__.py` | Registers every staff router |
 
 ### Routers
@@ -150,6 +150,7 @@ Routers should not contain business logic. If a rule matters, put it in a servic
 | `backend/api/v1/routers/repairs.py` | Repair booking, intake, assignment, diagnosis, parts, billing |
 | `backend/api/v1/routers/expenses.py` | Expense categories and expense approval workflow |
 | `backend/api/v1/routers/reports.py` | Dashboard, sales, inventory, repair, expense summaries |
+| `backend/api/v1/routers/storefront.py` | Public website catalog: categories, brands, products, safe availability |
 
 ### Core
 
@@ -197,6 +198,7 @@ Routers should not contain business logic. If a rule matters, put it in a servic
 | `backend/schemas/branch_schemas.py` | Branch create/update/response |
 | `backend/schemas/user_schemas.py` | Staff user, role, permission schemas |
 | `backend/schemas/products_schemas.py` | Catalog categories, brands, products, variants, images, import |
+| `backend/schemas/storefront_schemas.py` | Public website catalog responses without internal pricing/cost fields |
 | `backend/schemas/supplier_schemas.py` | Supplier create/update/response |
 | `backend/schemas/purchase_schemas.py` | Purchase orders and goods receipts |
 | `backend/schemas/inventory_schemas.py` | Balances, units, movements, adjustments, transfers |
@@ -226,6 +228,7 @@ Routers should not contain business logic. If a rule matters, put it in a servic
 | `backend/services/staff.py` | Staff management and assignment limits |
 | `backend/services/catalog.py` | Catalog CRUD/publication rules |
 | `backend/services/catalog_import.py` | CSV catalog import validation/import |
+| `backend/services/storefront.py` | Public catalog listing/detail logic with safe stock availability counts |
 | `backend/services/suppliers.py` | Supplier CRUD |
 | `backend/services/purchasing.py` | Purchase order workflow and receiving |
 | `backend/services/inventory.py` | Central stock ledger operations |
@@ -279,6 +282,24 @@ Important rules:
   actions need manager/admin approval.
 
 ## Endpoint reference
+
+Public website API endpoints are prefixed with:
+
+```text
+/api/v1/storefront
+```
+
+These routes do not require staff authentication. They expose only active/published
+catalog data and safe stock availability counts.
+
+### Storefront
+
+| Method | Path | Params | Body | What it does |
+| --- | --- | --- | --- | --- |
+| GET | `/categories` | - | - | Lists active website categories with published product counts |
+| GET | `/brands` | - | - | Lists active brands with published product counts |
+| GET | `/products` | `page`, `page_size`, `q`, `category`, `brand_id`, `branch_id`, `in_stock_only` query | - | Lists active published website products and safe availability |
+| GET | `/products/{slug}` | `slug` path, `branch_id` query | - | Gets one active published website product by slug |
 
 All staff API endpoints are prefixed with:
 

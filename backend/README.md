@@ -78,6 +78,12 @@ Catalog management is available under `/api/v1/staff/catalog`. Read responses ex
 selling prices but keep cost prices and minimum-price floors restricted to management
 commands. Publishing requires an active variant and at least one product image.
 
+The public website catalog reads from `/api/v1/storefront`. These endpoints do not require
+staff authentication and expose only website-safe data: active published products, active
+categories and brands, product images, selling prices, and stock availability counts.
+They do not expose cost prices, minimum selling prices, serial numbers, IMEIs, stock
+movement history, or management notes.
+
 CSV catalog imports can be checked before mutation at
 `/api/v1/staff/catalog/products/import/validate`. Required columns are `product_name`,
 `product_slug`, `variant_name`, `sku`, `cost_price`, and `selling_price`. Optional columns
@@ -159,7 +165,7 @@ sale voids, and returns. Reports are calculated from live operational records ra
 stored totals, remain branch-scoped for non-Admin staff, and allow technicians to view
 only their own assigned repair report scope.
 
-The next internal implementation slice is hardening: export-friendly report formats,
-small module-level usability fixes, and optional push-style dashboard events if the client
-needs instant updates. Website, deployment, permanent image storage, and full redesign work
-are intentionally parked for later client review.
+The next implementation slice is online ordering: accepting website checkout payloads,
+creating customer records, reserving stock safely, and exposing order tracking without
+requiring staff authentication. Deployment, permanent image storage, and full redesign work
+remain parked for later client review.
