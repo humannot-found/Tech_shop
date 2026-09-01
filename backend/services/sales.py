@@ -396,6 +396,12 @@ def _create_warranties(
         )
 
 
+def create_warranties_for_sale(
+    db: Session, sale: Sale, items: list[SaleItem], now: datetime
+) -> None:
+    _create_warranties(db, sale, items, now)
+
+
 def _complete_sale_if_fully_paid(
     db: Session,
     *,

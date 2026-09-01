@@ -5,6 +5,7 @@ from backend.api.v1.routers.branches import router as branches_router
 from backend.api.v1.routers.catalog import router as catalog_router
 from backend.api.v1.routers.expenses import router as expenses_router
 from backend.api.v1.routers.inventory import router as inventory_router
+from backend.api.v1.routers.orders import router as orders_router
 from backend.api.v1.routers.pos import router as pos_router
 from backend.api.v1.routers.purchasing import router as purchasing_router
 from backend.api.v1.routers.repairs import router as repairs_router
@@ -19,6 +20,7 @@ router.include_router(catalog_router)
 router.include_router(purchasing_router)
 router.include_router(inventory_router)
 router.include_router(pos_router)
+router.include_router(orders_router)
 router.include_router(repairs_router)
 router.include_router(expenses_router)
 router.include_router(reports_router)

@@ -25,6 +25,7 @@ from backend.models.enums import (
     PaymentMethod,
     RepairStatus,
     SaleChannel,
+    SaleStatus,
     SerializedUnitStatus,
     StockCountStatus,
     TillSessionStatus,
@@ -81,12 +82,14 @@ from backend.schemas.repair_schemas import (
 )
 from backend.schemas.sales_schemas import SaleCreate, SaleItemCreate, TillCreate, TillSessionOpen
 from backend.schemas.stocktake_schemas import StockCountCreate
+from backend.schemas.storefront_schemas import StorefrontOrderCreate
 from backend.schemas.supplier_schemas import SupplierCreate
 from backend.services import (
     catalog,
     customers,
     expenses,
     inventory_control,
+    storefront,
     purchasing,
     repair_billing,
     repairs,
@@ -1241,6 +1244,53 @@ def _expenses(
     result.ids["expense"] = str(expense.id)
 
 
+def _website_order(
+    db: Session,
+    result: DemoSeedResult,
+    branch: Branch,
+    variants: dict[str, ProductVariant],
+) -> None:
+    existing = db.scalar(
+        select(Sale).where(
+            Sale.channel == SaleChannel.ONLINE,
+            Sale.status.in_({SaleStatus.PENDING_PAYMENT, SaleStatus.PAID}),
+            Sale.notes.ilike("%Customer note: Demo website checkout%"),
+            Sale.is_deleted.is_(False),
+        )
+    )
+    if existing is not None:
+        result.ids["online_order"] = str(existing.id)
+        return
+
+    try:
+        order = storefront.create_order(
+            db,
+            StorefrontOrderCreate(
+                branch_id=branch.id,
+                customer={
+                    "full_name": "Website Customer 1",
+                    "phone": "0700111222",
+                    "email": "website.customer1@example.com",
+                    "address": "Nairobi CBD pickup desk",
+                },
+                items=[
+                    {
+                        "variant_id": variants["DEMO-CHG-USBC20"].id,
+                        "quantity": 2,
+                    }
+                ],
+                delivery_method="pickup",
+                notes="Demo website checkout",
+            ),
+        )
+    except ServiceError as exc:
+        result.skip(f"online order skipped: {exc}")
+        return
+
+    result.add("online_orders")
+    result.ids["online_order"] = str(order.id)
+
+
 def seed_demo_data(db: Session, *, password: str = DEMO_PASSWORD) -> DemoSeedResult:
     """Seed a coherent demo dataset for the staff API.
 
@@ -1729,5 +1779,6 @@ def seed_demo_data(db: Session, *, password: str = DEMO_PASSWORD) -> DemoSeedRes
         variants,
     )
     _expenses(db, result, manager, hq)
+    _website_order(db, result, hq, variants)
     db.flush()
     return result

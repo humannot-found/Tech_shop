@@ -61,7 +61,8 @@ python -m backend.cli.seed_demo
 The seed creates reusable branches, users, catalog items, stock, POS, repairs,
 expenses, and report data. It includes serial-tracked laptops, IMEI-tracked phones,
 bulk accessories, and repair parts so Catalog, Purchases, Inventory, POS, and Repairs
-can be reviewed as one connected flow. Default seeded password is `DemoPass123!`.
+can be reviewed as one connected flow. It also creates one pending website order for
+the staff online-order queue. Default seeded password is `DemoPass123!`.
 
 Run a read-only backend smoke check after seeding with:
 
@@ -86,6 +87,11 @@ online sale in pending-payment status, reserve available stock for 24 hours, and
 customers to track an order with their order number plus phone number. They do not expose
 cost prices, minimum selling prices, serial numbers, IMEIs, stock movement history, or
 management notes.
+
+Staff online order handling is available under `/api/v1/staff/orders`. Admins, Branch
+Managers, and Inventory Managers can view the order queue, record confirmed payments,
+allocate exact serial/IMEI units for phones or laptops, mark orders ready, fulfill orders,
+or cancel unpaid orders while releasing reserved stock.
 
 CSV catalog imports can be checked before mutation at
 `/api/v1/staff/catalog/products/import/validate`. Required columns are `product_name`,
@@ -168,7 +174,7 @@ sale voids, and returns. Reports are calculated from live operational records ra
 stored totals, remain branch-scoped for non-Admin staff, and allow technicians to view
 only their own assigned repair report scope.
 
-The next implementation slice is storefront payment and fulfillment handoff: connecting
-website checkout to online M-Pesa/card flows, then giving staff a clean queue to confirm,
-pack, fulfill, or cancel online orders. Deployment, permanent image storage, and full
-redesign work remain parked for later client review.
+The next implementation slice is storefront payment automation: connecting website
+checkout to online M-Pesa/card flows so confirmed provider callbacks can move website
+orders from pending payment into the staff fulfillment queue automatically. Deployment,
+permanent image storage, and full redesign work remain parked for later client review.

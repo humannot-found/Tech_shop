@@ -8,7 +8,13 @@ from sqlalchemy.orm import Session
 from backend.models.branch import Branch
 from backend.models.brand import Brand
 from backend.models.customer import Customer
-from backend.models.enums import BranchStatus, FulfillmentStatus, SaleChannel, SaleStatus
+from backend.models.enums import (
+    BranchStatus,
+    FulfillmentStatus,
+    SaleChannel,
+    SaleStatus,
+    TrackingType,
+)
 from backend.models.inventory import StockBalance, StockReservation
 from backend.models.products import Category, Product, ProductImage, ProductVariant
 from backend.models.sales import Sale, SaleItem
@@ -626,21 +632,24 @@ def create_order(db: Session, payload: StorefrontOrderCreate) -> StorefrontOrder
     for variant_id, quantity in requested_quantities.items():
         variant, product = products[variant_id]
         balance = balances[variant_id]
-        line_total = money(variant.selling_price * quantity)
-        subtotal += line_total
-        prepared_items.append(
-            {
-                "variant_id": variant.id,
-                "serialized_unit_id": None,
-                "description": f"{product.name} - {variant.name}",
-                "quantity": quantity,
-                "unit_price": variant.selling_price,
-                "unit_cost": balance.average_unit_cost,
-                "discount_amount": Decimal("0.00"),
-                "tax_amount": Decimal("0.00"),
-                "line_total": line_total,
-            }
-        )
+        line_quantity = quantity if variant.tracking_type == TrackingType.BULK else 1
+        line_count = 1 if variant.tracking_type == TrackingType.BULK else quantity
+        for _ in range(line_count):
+            line_total = money(variant.selling_price * line_quantity)
+            subtotal += line_total
+            prepared_items.append(
+                {
+                    "variant_id": variant.id,
+                    "serialized_unit_id": None,
+                    "description": f"{product.name} - {variant.name}",
+                    "quantity": line_quantity,
+                    "unit_price": variant.selling_price,
+                    "unit_cost": balance.average_unit_cost,
+                    "discount_amount": Decimal("0.00"),
+                    "tax_amount": Decimal("0.00"),
+                    "line_total": line_total,
+                }
+            )
 
     if subtotal <= 0:
         raise ValidationError("order total must be greater than zero")

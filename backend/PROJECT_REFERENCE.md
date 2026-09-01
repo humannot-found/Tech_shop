@@ -74,6 +74,7 @@ Seeded records include:
 - Pending inventory adjustment request, draft stock transfer, stock count workflow
 - Ready and paid repair ticket
 - Approved expense
+- Pending website order reserved against live stock
 
 ## Current project track
 
@@ -148,6 +149,7 @@ Routers should not contain business logic. If a rule matters, put it in a servic
 | `backend/api/v1/routers/purchasing.py` | Suppliers, purchase orders, goods receipts |
 | `backend/api/v1/routers/inventory.py` | Balances, units, movements, adjustments, transfers, stock counts |
 | `backend/api/v1/routers/pos.py` | Tills, customers, POS sales, payments, returns, warranties |
+| `backend/api/v1/routers/orders.py` | Staff online-order queue, payments, allocation, fulfillment, cancellation |
 | `backend/api/v1/routers/repairs.py` | Repair booking, intake, assignment, diagnosis, parts, billing |
 | `backend/api/v1/routers/expenses.py` | Expense categories and expense approval workflow |
 | `backend/api/v1/routers/reports.py` | Dashboard, sales, inventory, repair, expense summaries |
@@ -206,6 +208,7 @@ Routers should not contain business logic. If a rule matters, put it in a servic
 | `backend/schemas/stocktake_schemas.py` | Stock count workflow |
 | `backend/schemas/customer_schemas.py` | POS customer contracts |
 | `backend/schemas/sales_schemas.py` | Tills, sales, payments, receipts, returns |
+| `backend/schemas/online_order_schemas.py` | Staff online-order queue, payment, allocation, and fulfillment contracts |
 | `backend/schemas/payments_schemas.py` | Payment contracts |
 | `backend/schemas/warranty_schemas.py` | Warranty lookup response |
 | `backend/schemas/approval_schemas.py` | Approval decision/request response |
@@ -239,6 +242,7 @@ Routers should not contain business logic. If a rule matters, put it in a servic
 | `backend/services/tills.py` | Tills and till sessions |
 | `backend/services/customers.py` | POS customer creation/listing |
 | `backend/services/sales.py` | POS sales, payments, stock deduction, warranties |
+| `backend/services/online_orders.py` | Staff handling for online-order payment, packing, fulfillment, and cancellation |
 | `backend/services/mpesa.py` | M-Pesa Daraja STK Push initiation and callback completion |
 | `backend/services/returns.py` | Voids, returns, refunds |
 | `backend/services/repairs.py` | Repair workflow and parts usage |
@@ -436,6 +440,18 @@ matching `backend/schemas/*_schemas.py` file or in Swagger.
 | POST | `/pos/sales/{sale_id}/returns` | `sale_id` path | `SaleReturnCreate` | Requests product return |
 | POST | `/pos/returns/{return_id}/decision` | `return_id` path | `ApprovalDecision` | Approves/rejects return and refund |
 | GET | `/pos/warranties/lookup` | `identifier` query | - | Looks up warranty by serial/IMEI |
+
+### Online orders
+
+| Method | Path | Params | Body | What it does |
+| --- | --- | --- | --- | --- |
+| GET | `/orders` | `branch_id`, `page`, `page_size`, `status`, `fulfillment_status` query | - | Lists website orders for the permitted branch scope |
+| GET | `/orders/{order_id}` | `order_id` path | - | Gets one website order with customer, item, payment, and reservation details |
+| POST | `/orders/{order_id}/payments` | `order_id` path | `OnlineOrderPaymentCreate` | Records a confirmed online-order payment without deducting stock yet |
+| POST | `/orders/{order_id}/allocate` | `order_id` path | `OnlineOrderAllocate` | Assigns exact serial/IMEI units for serialized order items |
+| POST | `/orders/{order_id}/ready` | `order_id` path | `OnlineOrderNote` | Auto-allocates if needed and marks the paid order ready for pickup/dispatch |
+| POST | `/orders/{order_id}/fulfill` | `order_id` path | `OnlineOrderNote` | Deducts reserved stock, marks serial/IMEI units sold, creates warranties, and completes the order |
+| POST | `/orders/{order_id}/cancel` | `order_id` path | `OnlineOrderNote` | Cancels an unpaid order and releases its reserved stock |
 
 ### Repairs
 
