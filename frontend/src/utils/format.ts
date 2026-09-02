@@ -33,21 +33,29 @@ export function toneForStatus(status: string | boolean | null | undefined): Stat
   if (typeof status === "boolean") return status ? "success" : "danger";
   const normalized = String(status ?? "").toLowerCase();
   if (
-    ["active", "available", "approved", "completed", "paid", "received"].includes(
+    ["active", "available", "approved", "completed", "fulfilled", "paid", "received"].includes(
       normalized,
     )
   ) {
     return "success";
   }
   if (
-    ["ready", "ready_for_pickup", "submitted", "partially_received"].includes(
+    ["allocated", "ready", "ready_for_pickup", "submitted", "partially_received"].includes(
       normalized,
     )
   ) {
     return "info";
   }
   if (
-    ["draft", "pending", "diagnosing", "awaiting_parts", "quote_pending"].includes(
+    [
+      "draft",
+      "pending",
+      "pending_payment",
+      "unfulfilled",
+      "diagnosing",
+      "awaiting_parts",
+      "quote_pending",
+    ].includes(
       normalized,
     )
   ) {

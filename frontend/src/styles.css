@@ -5056,3 +5056,225 @@ button:disabled {
     border: 0;
   }
 }
+
+.online-order-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.4fr) minmax(180px, 0.8fr) minmax(220px, 0.9fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: var(--shadow-soft);
+}
+
+.online-order-filter-bar label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.online-order-filter-bar input,
+.online-order-filter-bar select {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  padding: 0 12px;
+}
+
+.online-order-filter-bar button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 800;
+  padding: 0 16px;
+  cursor: pointer;
+}
+
+.online-order-filter-bar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.online-order-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(380px, 0.9fr);
+  align-items: start;
+  gap: 18px;
+}
+
+.online-order-list-panel,
+.online-order-detail-panel {
+  min-width: 0;
+}
+
+.online-order-table-wrap {
+  overflow: auto;
+  max-height: 680px;
+  padding-right: 2px;
+}
+
+.online-order-table-wrap .data-table tbody tr {
+  cursor: pointer;
+}
+
+.online-order-table-wrap .data-table tbody tr.is-selected {
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+}
+
+.online-order-table-wrap .data-table td span {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.online-order-detail {
+  display: grid;
+  gap: 14px;
+}
+
+.online-order-money-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.online-order-money-strip div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.online-order-money-strip span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.online-order-money-strip strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.online-order-next-step {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 9%, var(--panel));
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.online-order-subsection {
+  display: grid;
+  gap: 10px;
+}
+
+.online-order-subsection h3,
+.action-form h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.online-order-payment-list {
+  display: grid;
+  gap: 8px;
+}
+
+.online-order-payment-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.online-order-payment-row div {
+  display: grid;
+  gap: 3px;
+}
+
+.online-order-payment-row div:last-child {
+  text-align: right;
+}
+
+.online-order-payment-row span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.online-order-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.online-order-action-grid button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.online-order-action-grid button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.online-order-action-grid .danger-action {
+  background: color-mix(in srgb, #dc2626 88%, #111827);
+  color: #fff;
+}
+
+@media (max-width: 1180px) {
+  .online-order-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .online-order-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .online-order-table-wrap {
+    max-height: 520px;
+  }
+}
+
+@media (max-width: 720px) {
+  .online-order-filter-bar,
+  .online-order-money-strip,
+  .online-order-action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .online-order-payment-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .online-order-payment-row div:last-child {
+    text-align: left;
+  }
+}

@@ -6,6 +6,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { ExpensesPage } from "./pages/ExpensesPage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { LoginPage } from "./pages/LoginPage";
+import { OnlineOrdersPage } from "./pages/OnlineOrdersPage";
 import { PosPage } from "./pages/PosPage";
 import { PurchasesPage } from "./pages/PurchasesPage";
 import { RepairsPage } from "./pages/RepairsPage";
@@ -61,6 +62,7 @@ export function App() {
     if (view === "repairs") {
       return <RepairsPage onOpenRepairPayment={openRepairPaymentInPos} />;
     }
+    if (view === "orders") return <OnlineOrdersPage />;
     if (view === "purchases") return <PurchasesPage />;
     if (view === "expenses") return <ExpensesPage />;
     if (view === "reports") return <ReportsPage />;

@@ -314,6 +314,82 @@ export type Payment = ModelResponse & {
   notes: string | null;
 };
 
+export type OnlineOrderCustomer = {
+  customer_id: UUID | null;
+  full_name: string | null;
+  phone: string | null;
+  email: string | null;
+};
+
+export type OnlineOrderItem = ModelResponse & {
+  sale_id: UUID;
+  variant_id: UUID;
+  serialized_unit_id: UUID | null;
+  description: string;
+  sku: string;
+  tracking_type: "bulk" | "serial" | "imei";
+  quantity: number;
+  unit_price: string;
+  discount_amount: string;
+  tax_amount: string;
+  line_total: string;
+  serial_number: string | null;
+  imei: string | null;
+};
+
+export type OnlineOrder = ModelResponse & {
+  branch_id: UUID;
+  branch_name: string;
+  order_number: string;
+  status: "draft" | "pending_payment" | "paid" | "completed" | "cancelled" | "voided" | "refunded";
+  fulfillment_status:
+    | "not_required"
+    | "unfulfilled"
+    | "allocated"
+    | "ready"
+    | "fulfilled"
+    | "cancelled";
+  customer: OnlineOrderCustomer;
+  delivery_method: string;
+  delivery_address: string | null;
+  customer_note: string | null;
+  subtotal: string;
+  tax_amount: string;
+  discount_amount: string;
+  total_amount: string;
+  paid_amount: string;
+  balance_due: string;
+  reservation_expires_at: string | null;
+  completed_at: string | null;
+  items: OnlineOrderItem[];
+  payments: Payment[];
+};
+
+export type OnlineOrderPaymentPayload = {
+  method: "cash" | "mpesa" | "card" | "bank_transfer";
+  amount: string | number;
+  till_session_id?: UUID | null;
+  provider_reference?: string | null;
+  payer_phone?: string | null;
+  payer_name?: string | null;
+  payer_account_reference?: string | null;
+  idempotency_key: string;
+  notes?: string | null;
+};
+
+export type OnlineOrderAllocatePayload = {
+  auto_assign_serialized_units?: boolean;
+  items?: Array<{
+    sale_item_id: UUID;
+    serialized_unit_id?: UUID | null;
+  }>;
+  note?: string | null;
+};
+
+export type OnlineOrderNotePayload = {
+  note?: string | null;
+};
+
 export type MpesaStkPushResponse = {
   payment: Payment;
   merchant_request_id: string;

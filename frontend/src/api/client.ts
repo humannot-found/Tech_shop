@@ -27,6 +27,10 @@ import type {
   GoodsReceiptPayload,
   InventoryBalance,
   MpesaManualConfirmPayload,
+  OnlineOrder,
+  OnlineOrderAllocatePayload,
+  OnlineOrderNotePayload,
+  OnlineOrderPaymentPayload,
   MpesaStkPushPayload,
   MpesaStkQueryResponse,
   MpesaStkPushResponse,
@@ -446,6 +450,92 @@ export function listPosSales(
       page_size: options?.pageSize ?? 12,
       status: options?.status,
     },
+  });
+}
+
+export function listOnlineOrders(
+  token: string,
+  options: {
+    branchId?: string;
+    status?: string;
+    fulfillmentStatus?: string;
+    pageSize?: number;
+  } = {},
+) {
+  return apiRequest<Page<OnlineOrder>>("/orders", {
+    token,
+    query: {
+      branch_id: options.branchId,
+      status: options.status === "all" ? undefined : options.status,
+      fulfillment_status:
+        options.fulfillmentStatus === "all" ? undefined : options.fulfillmentStatus,
+      page: 1,
+      page_size: options.pageSize ?? 100,
+    },
+  });
+}
+
+export function getOnlineOrder(token: string, orderId: string) {
+  return apiRequest<OnlineOrder>(`/orders/${orderId}`, { token });
+}
+
+export function recordOnlineOrderPayment(
+  token: string,
+  orderId: string,
+  body: OnlineOrderPaymentPayload,
+) {
+  return apiRequest<OnlineOrder>(`/orders/${orderId}/payments`, {
+    token,
+    method: "POST",
+    body,
+  });
+}
+
+export function allocateOnlineOrder(
+  token: string,
+  orderId: string,
+  body: OnlineOrderAllocatePayload,
+) {
+  return apiRequest<OnlineOrder>(`/orders/${orderId}/allocate`, {
+    token,
+    method: "POST",
+    body,
+  });
+}
+
+export function markOnlineOrderReady(
+  token: string,
+  orderId: string,
+  body: OnlineOrderNotePayload,
+) {
+  return apiRequest<OnlineOrder>(`/orders/${orderId}/ready`, {
+    token,
+    method: "POST",
+    body,
+  });
+}
+
+export function fulfillOnlineOrder(
+  token: string,
+  orderId: string,
+  body: OnlineOrderNotePayload,
+) {
+  return apiRequest<OnlineOrder>(`/orders/${orderId}/fulfill`, {
+    token,
+    method: "POST",
+    body,
+  });
+}
+
+export function cancelOnlineOrder(
+  token: string,
+  orderId: string,
+  body: OnlineOrderNotePayload,
+) {
+  return apiRequest<OnlineOrder>(`/orders/${orderId}/cancel`, {
+    token,
+    method: "POST",
+    body,
   });
 }
 

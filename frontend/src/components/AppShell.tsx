@@ -12,6 +12,7 @@ export type AppView =
   | "catalog"
   | "inventory"
   | "repairs"
+  | "orders"
   | "purchases"
   | "expenses"
   | "reports"
@@ -80,6 +81,13 @@ const navItems: NavItem[] = [
       "reports.own_repairs.view",
       "reports.repairs.view",
     ],
+  },
+  {
+    key: "orders",
+    label: "Online Orders",
+    description: "Website order queue, payment confirmation, allocation, and fulfillment.",
+    roles: ["admin", "owner", "branch_manager", "inventory_manager"],
+    permissions: ["orders.fulfill"],
   },
   {
     key: "purchases",
