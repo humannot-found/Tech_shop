@@ -114,6 +114,12 @@ export function createStorefrontOrder(payload) {
   })
 }
 
+export function getStorefrontOrder(orderNumber, phone) {
+  return request(`/storefront/orders/${encodeURIComponent(orderNumber)}`, {
+    query: { phone },
+  })
+}
+
 export function sendStorefrontMpesaPrompt(orderNumber, phone, payload) {
   return request(`/storefront/orders/${encodeURIComponent(orderNumber)}/mpesa/stk-push`, {
     method: 'POST',

@@ -6,16 +6,18 @@ import {
   sendStorefrontMpesaPrompt,
 } from '@/api/storefront'
 import { cartItemKey, useCartStore } from '@/stores/cart'
+import { useCustomerProfileStore } from '@/stores/customerProfile'
 
 const cartStore = useCartStore()
+const customerProfileStore = useCustomerProfileStore()
 
 const form = ref({
-  fullName: '',
-  phone: '',
-  email: '',
-  deliveryMethod: 'pickup',
-  county: '',
-  deliveryAddress: '',
+  fullName: customerProfileStore.profile.fullName,
+  phone: customerProfileStore.profile.phone,
+  email: customerProfileStore.profile.email,
+  deliveryMethod: customerProfileStore.profile.deliveryMethod,
+  county: customerProfileStore.profile.county,
+  deliveryAddress: customerProfileStore.profile.deliveryAddress,
   deliveryNotes: '',
 })
 
@@ -90,6 +92,19 @@ function orderPayload() {
   }
 }
 
+function saveCheckoutProfile(order = null) {
+  const phone = cleanPhone()
+  customerProfileStore.updateProfile({
+    fullName: form.value.fullName.trim(),
+    phone,
+    email: form.value.email.trim(),
+    deliveryMethod: form.value.deliveryMethod,
+    county: form.value.county.trim(),
+    deliveryAddress: form.value.deliveryAddress.trim(),
+  })
+  if (order) customerProfileStore.rememberOrder(order, phone)
+}
+
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -104,6 +119,7 @@ async function pollMpesaStatus(orderNumber, phone, checkoutRequestId) {
     const status = await getStorefrontMpesaStatus(orderNumber, phone, checkoutRequestId)
     mpesaPayment.value = status
     placedOrder.value = status.order
+    customerProfileStore.rememberOrder(status.order, phone)
 
     if (!isFinishedPayment(status)) continue
 
@@ -137,6 +153,7 @@ async function placeOrder() {
   try {
     const order = await createStorefrontOrder(orderPayload())
     placedOrder.value = order
+    saveCheckoutProfile(order)
 
     if (paymentMethod.value !== 'mpesa') {
       orderPlaced.value = true
@@ -186,7 +203,20 @@ async function placeOrder() {
           <span v-if="paymentMethod === 'mpesa'"> Payment is confirmed.</span>
         </p>
         <p v-else>You'll receive a confirmation shortly with your order details.</p>
-        <RouterLink to="/shop" class="continue-btn">Continue Shopping</RouterLink>
+        <div class="success-actions">
+          <RouterLink
+            v-if="placedOrder"
+            :to="{
+              name: 'track-order',
+              query: { order: placedOrder.order_number, phone: cleanPhone() },
+            }"
+            class="continue-btn"
+          >
+            Track this order
+          </RouterLink>
+          <RouterLink to="/account" class="continue-btn secondary">View account</RouterLink>
+          <RouterLink to="/shop" class="continue-btn secondary">Continue Shopping</RouterLink>
+        </div>
       </div>
 
       <template v-else>
@@ -705,8 +735,27 @@ textarea:focus {
   text-transform: uppercase;
 }
 
+.success-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.continue-btn.secondary {
+  border: 1px solid #e1dfdc;
+  background: #fff;
+  color: #17181c;
+}
+
 .continue-btn:hover {
   background: #ee6c1f;
+}
+
+.continue-btn.secondary:hover {
+  border-color: #ee6c1f;
+  background: #fff7f0;
+  color: #9d4411;
 }
 
 @media (max-width: 860px) {

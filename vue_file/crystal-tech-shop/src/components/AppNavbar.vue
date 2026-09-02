@@ -92,6 +92,7 @@ function closeMobileMenu() {
         <li><RouterLink to="/shop" @click="closeCategoriesNow">Shop</RouterLink></li>
         <li><RouterLink to="/about" @click="closeCategoriesNow">About</RouterLink></li>
         <li><RouterLink to="/support" @click="closeCategoriesNow">Support</RouterLink></li>
+        <li><RouterLink to="/track-order" @click="closeCategoriesNow">Track Order</RouterLink></li>
         <li class="dropdown-wrap" @mouseenter="openCategories" @mouseleave="closeCategories">
           <button type="button" class="has-dropdown" :aria-expanded="categoriesOpen" @click="toggleCategories">
             Categories
@@ -211,6 +212,7 @@ function closeMobileMenu() {
       <RouterLink to="/shop" @click="closeMobileMenu">Shop</RouterLink>
       <RouterLink to="/about" @click="closeMobileMenu">About</RouterLink>
       <RouterLink to="/support" @click="closeMobileMenu">Support</RouterLink>
+      <RouterLink to="/track-order" @click="closeMobileMenu">Track Order</RouterLink>
       <RouterLink to="/wishlist" @click="closeMobileMenu">Wishlist</RouterLink>
       <RouterLink to="/account" @click="closeMobileMenu">Account</RouterLink>
 

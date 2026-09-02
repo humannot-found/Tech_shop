@@ -106,6 +106,23 @@ from backend.services.exceptions import ConflictError, ServiceError
 
 DEMO_PASSWORD = "DemoPass123!"
 
+DEMO_PRODUCT_IMAGE_URLS = {
+    "lenovo-thinkpad-t480": "https://placehold.co/900x900/17181c/ffffff/png?text=Lenovo+ThinkPad+T480",
+    "hp-elitebook-840-g6": "https://placehold.co/900x900/28344a/ffffff/png?text=HP+EliteBook+840+G6",
+    "apple-macbook-air-13-2017": "https://placehold.co/900x900/e8e3dc/17181c/png?text=MacBook+Air+13",
+    "samsung-galaxy-a15": "https://placehold.co/900x900/1f2937/ffffff/png?text=Samsung+Galaxy+A15",
+    "infinix-hot-40i": "https://placehold.co/900x900/1e3a8a/ffffff/png?text=Infinix+Hot+40i",
+    "apple-iphone-11": "https://placehold.co/900x900/111827/ffffff/png?text=iPhone+11",
+    "oraimo-usb-c-charger": "https://placehold.co/900x900/f97316/ffffff/png?text=Oraimo+USB-C+Charger",
+    "oraimo-type-c-cable": "https://placehold.co/900x900/f59e0b/17181c/png?text=Oraimo+Type-C+Cable",
+    "oraimo-power-bank-20000mah": "https://placehold.co/900x900/0f172a/ffffff/png?text=Oraimo+Power+Bank",
+    "kingston-64gb-flash-disk": "https://placehold.co/900x900/0ea5e9/ffffff/png?text=Kingston+64GB+USB",
+    "sandisk-memory-card-128gb": "https://placehold.co/900x900/b91c1c/ffffff/png?text=SanDisk+128GB+MicroSD",
+    "galaxy-a15-screen-assembly": "https://placehold.co/900x900/334155/ffffff/png?text=Galaxy+A15+Screen",
+    "iphone-11-battery": "https://placehold.co/900x900/475569/ffffff/png?text=iPhone+11+Battery",
+    "type-c-charging-port": "https://placehold.co/900x900/64748b/ffffff/png?text=Type-C+Charging+Port",
+}
+
 
 @dataclass
 class DemoSeedResult:
@@ -344,6 +361,53 @@ def _product_by_slug(db: Session, slug: str) -> Product | None:
     )
 
 
+def _seed_image_url(slug: str) -> str:
+    return DEMO_PRODUCT_IMAGE_URLS.get(
+        slug,
+        f"https://placehold.co/900x900/f7f5f2/17181c/png?text={slug.replace('-', '+')}",
+    )
+
+
+def _sync_primary_product_image(
+    db: Session,
+    result: DemoSeedResult,
+    principal: AuthPrincipal,
+    *,
+    product_id: UUID,
+    slug: str,
+    name: str,
+) -> None:
+    image = db.scalar(
+        select(ProductImage)
+        .where(
+            ProductImage.product_id == product_id,
+            ProductImage.position == 0,
+            ProductImage.is_deleted.is_(False),
+        )
+        .order_by(ProductImage.created_at)
+        .limit(1)
+    )
+    url = _seed_image_url(slug)
+    if image is None:
+        catalog.create_image(
+            db,
+            principal,
+            product_id,
+            ProductImageCreate(
+                url=url,
+                alt_text=name,
+                position=0,
+            ),
+        )
+        result.add("product_images")
+        return
+
+    if image.url != url or image.alt_text != name:
+        image.url = url
+        image.alt_text = name
+        result.add("product_images_updated")
+
+
 def _product_with_variant(
     db: Session,
     result: DemoSeedResult,
@@ -429,23 +493,14 @@ def _product_with_variant(
         variant.minimum_selling_price = minimum_selling_price
         variant.is_active = True
 
-    image_count = db.scalar(
-        select(func.count())
-        .select_from(ProductImage)
-        .where(ProductImage.product_id == product_id, ProductImage.is_deleted.is_(False))
+    _sync_primary_product_image(
+        db,
+        result,
+        principal,
+        product_id=product_id,
+        slug=slug,
+        name=name,
     )
-    if not image_count:
-        catalog.create_image(
-            db,
-            principal,
-            product_id,
-            ProductImageCreate(
-                url=f"https://example.com/demo/{slug}.jpg",
-                alt_text=name,
-                position=0,
-            ),
-        )
-        result.add("product_images")
     product = db.get(Product, product_id)
     if product is not None and not product.is_published:
         catalog.set_publication(db, principal, product.id, True)

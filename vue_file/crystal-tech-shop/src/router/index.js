@@ -60,12 +60,12 @@ const routes = [
   {
     path: '/account',
     name: 'account',
-    component: () => import('@/views/ShopView.vue'), // TODO: replace with AccountView.vue
+    component: () => import('@/views/AccountView.vue'),
   },
   {
     path: '/track-order',
     name: 'track-order',
-    component: () => import('@/views/SupportView.vue'), // TODO: replace with TrackOrderView.vue
+    component: () => import('@/views/TrackOrderView.vue'),
   },
   {
     path: '/policies/:page',

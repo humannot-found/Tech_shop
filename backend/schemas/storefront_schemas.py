@@ -107,6 +107,7 @@ class StorefrontOrderResponse(BaseSchema):
     id: UUID
     order_number: str
     branch_id: UUID
+    created_at: datetime
     status: SaleStatus
     fulfillment_status: FulfillmentStatus
     customer: StorefrontCustomerSummary

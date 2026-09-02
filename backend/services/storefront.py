@@ -576,6 +576,7 @@ def _order_response(db: Session, sale: Sale) -> StorefrontOrderResponse:
         id=sale.id,
         order_number=sale.invoice_number,
         branch_id=sale.branch_id,
+        created_at=sale.created_at,
         status=sale.status,
         fulfillment_status=sale.fulfillment_status,
         customer=StorefrontCustomerSummary(
