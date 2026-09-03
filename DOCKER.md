@@ -101,3 +101,20 @@ docker compose down -v
 ```
 
 Use `-v` carefully because it deletes the Docker PostgreSQL data.
+
+## Troubleshooting: Postgres port already allocated
+
+If Docker reports a message like:
+
+```text
+Bind for 0.0.0.0:5434 failed: port is already allocated
+```
+
+change the host port in `.env`:
+
+```text
+POSTGRES_PORT=5435
+```
+
+The backend container still connects to `postgres:5432` internally. This setting only
+controls the port exposed to Windows for tools like pgAdmin, DBeaver, or psql.
