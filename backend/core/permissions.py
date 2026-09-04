@@ -135,11 +135,12 @@ ROLE_DEFINITIONS = (
     RoleDefinition(
         CASHIER,
         "Cashier",
-        "Point of sale, repair reception, and own till access",
+        "Point of sale, online order handling, repair reception, and own till access",
         frozenset(
             {
                 "catalog.view",
                 "inventory.view",
+                "orders.fulfill",
                 "sales.process",
                 "tills.own.view",
                 "repairs.view",

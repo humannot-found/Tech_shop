@@ -37,6 +37,7 @@ const previewUser: CurrentUser = {
   permissions: [
     "catalog.view",
     "inventory.view",
+    "orders.fulfill",
     "sales.process",
     "tills.own.view",
     "repairs.view",

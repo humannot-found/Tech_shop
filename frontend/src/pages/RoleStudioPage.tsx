@@ -101,6 +101,7 @@ const demoPermissionCodesByRole: Record<string, string[]> = {
   cashier: [
     "catalog.view",
     "inventory.view",
+    "orders.fulfill",
     "sales.process",
     "tills.own.view",
     "repairs.view",

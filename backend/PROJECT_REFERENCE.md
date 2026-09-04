@@ -53,8 +53,8 @@ Seeded staff users:
 | Branch Manager | `manager2` | East branch operations, approvals, expenses |
 | Inventory Manager | `inventory1` | Purchasing, receiving, inventory work |
 | Technician | `technician1` | Assigned repair tickets |
-| Cashier | `cashier1` | HQ POS sales, till, repair payments |
-| Cashier | `cashier2` | East branch POS sales, till, repair payments |
+| Cashier | `cashier1` | HQ POS sales, till, online orders, repair payments |
+| Cashier | `cashier2` | East branch POS sales, till, online orders, repair payments |
 | Accountant | `accountant1` | Read-only financial/reporting access |
 
 Seeded records include:

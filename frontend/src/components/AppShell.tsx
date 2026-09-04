@@ -86,7 +86,7 @@ const navItems: NavItem[] = [
     key: "orders",
     label: "Online Orders",
     description: "Website order queue, payment confirmation, allocation, and fulfillment.",
-    roles: ["admin", "owner", "branch_manager", "inventory_manager"],
+    roles: ["admin", "owner", "branch_manager", "inventory_manager", "cashier"],
     permissions: ["orders.fulfill"],
   },
   {

@@ -89,9 +89,10 @@ cost prices, minimum selling prices, serial numbers, IMEIs, stock movement histo
 management notes.
 
 Staff online order handling is available under `/api/v1/staff/orders`. Admins, Branch
-Managers, and Inventory Managers can view the order queue, record confirmed payments,
-allocate exact serial/IMEI units for phones or laptops, mark orders ready, fulfill orders,
-or cancel unpaid orders while releasing reserved stock.
+Managers, Inventory Managers, and Cashiers can view the order queue, record confirmed
+payments, allocate exact serial/IMEI units for phones or laptops, mark orders ready,
+fulfill orders, or cancel unpaid orders while releasing reserved stock. Cashier access is
+important because cash payments are tied to the signed-in cashier's open till session.
 
 CSV catalog imports can be checked before mutation at
 `/api/v1/staff/catalog/products/import/validate`. Required columns are `product_name`,
