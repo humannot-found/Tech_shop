@@ -479,6 +479,10 @@ export function getOnlineOrder(token: string, orderId: string) {
   return apiRequest<OnlineOrder>(`/orders/${orderId}`, { token });
 }
 
+export function getOnlineOrderReceipt(token: string, orderId: string) {
+  return apiRequest<Receipt>(`/orders/${orderId}/receipt`, { token });
+}
+
 export function recordOnlineOrderPayment(
   token: string,
   orderId: string,

@@ -12,6 +12,7 @@ from backend.schemas.online_order_schemas import (
     OnlineOrderPaymentCreate,
     OnlineOrderResponse,
 )
+from backend.schemas.sales_schemas import ReceiptResponse
 from backend.services import online_orders as online_order_service
 from backend.services.auth import AuthPrincipal
 
@@ -103,6 +104,15 @@ def cancel_online_order(
     item = online_order_service.cancel_order(db, principal, order_id, payload)
     db.commit()
     return item
+
+
+@router.get("/{order_id}/receipt", response_model=ReceiptResponse)
+def online_order_receipt(
+    order_id: UUID,
+    principal: OrdersPrincipal,
+    db: DatabaseSession,
+) -> ReceiptResponse:
+    return online_order_service.receipt(db, principal, order_id)
 
 
 @router.get("/{order_id}", response_model=OnlineOrderResponse)

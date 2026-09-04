@@ -452,6 +452,7 @@ matching `backend/schemas/*_schemas.py` file or in Swagger.
 | --- | --- | --- | --- | --- |
 | GET | `/orders` | `branch_id`, `page`, `page_size`, `status`, `fulfillment_status` query | - | Lists website orders for the permitted branch scope |
 | GET | `/orders/{order_id}` | `order_id` path | - | Gets one website order with customer, item, payment, and reservation details |
+| GET | `/orders/{order_id}/receipt` | `order_id` path | - | Gets printable receipt data once the online order is fully paid |
 | POST | `/orders/{order_id}/payments` | `order_id` path | `OnlineOrderPaymentCreate` | Records a confirmed online-order payment without deducting stock yet |
 | POST | `/orders/{order_id}/allocate` | `order_id` path | `OnlineOrderAllocate` | Assigns exact serial/IMEI units for serialized order items |
 | POST | `/orders/{order_id}/ready` | `order_id` path | `OnlineOrderNote` | Auto-allocates if needed and marks the paid order ready for pickup/dispatch |

@@ -5,6 +5,7 @@ import {
   cancelOnlineOrder,
   currentTillSession,
   fulfillOnlineOrder,
+  getOnlineOrderReceipt,
   listBranches,
   listOnlineOrders,
   markOnlineOrderReady,
@@ -14,6 +15,7 @@ import type {
   Branch,
   OnlineOrder,
   OnlineOrderPaymentPayload,
+  Receipt,
   TillSession,
 } from "../api/types";
 import { StatusPill } from "../components/StatusPill";
@@ -102,6 +104,14 @@ function orderItemCount(order: OnlineOrder) {
   return order.items.reduce((sum, item) => sum + item.quantity, 0);
 }
 
+function receiptDate(receipt: Receipt) {
+  if (receipt.completed_at) return receipt.completed_at;
+  const paymentWithDate = [...receipt.payments]
+    .reverse()
+    .find((payment) => payment.paid_at);
+  return paymentWithDate?.paid_at ?? null;
+}
+
 function isFullyPaid(order: OnlineOrder | undefined) {
   return Boolean(order && numberValue(order.balance_due) <= 0 && order.status !== "pending_payment");
 }
@@ -158,6 +168,8 @@ export function OnlineOrdersPage() {
   const [paymentForm, setPaymentForm] = useState(emptyPaymentForm);
   const [actionNote, setActionNote] = useState("");
   const [tillSession, setTillSession] = useState<TillSession | null>(null);
+  const [receiptViewer, setReceiptViewer] = useState<Receipt | null>(null);
+  const [receiptBusy, setReceiptBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -309,6 +321,31 @@ export function OnlineOrdersPage() {
     }
   }
 
+  async function openOrderReceipt(order = selectedOrder) {
+    if (!token || !order) {
+      setNotice("Select an online order before opening a receipt.");
+      return;
+    }
+    if (!isFullyPaid(order)) {
+      setNotice("Receipt becomes available after the online order is fully paid.");
+      return;
+    }
+
+    setReceiptBusy(true);
+    try {
+      const receipt = await getOnlineOrderReceipt(token, order.id);
+      setReceiptViewer(receipt);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not open online order receipt.");
+    } finally {
+      setReceiptBusy(false);
+    }
+  }
+
+  function printReceipt() {
+    window.print();
+  }
+
   async function handleRecordPayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token || !selectedOrder || paymentIssue) {
@@ -338,7 +375,21 @@ export function OnlineOrdersPage() {
         ...emptyPaymentForm,
         amount: numberValue(updated.balance_due) > 0 ? String(updated.balance_due) : "",
       });
-      setNotice(`Payment recorded for ${updated.order_number}.`);
+      if (isFullyPaid(updated)) {
+        try {
+          const receipt = await getOnlineOrderReceipt(token, updated.id);
+          setReceiptViewer(receipt);
+          setNotice(`Payment recorded for ${updated.order_number}. Receipt is ready.`);
+        } catch (receiptError) {
+          setNotice(
+            receiptError instanceof Error
+              ? `Payment recorded for ${updated.order_number}, but receipt could not open: ${receiptError.message}`
+              : `Payment recorded for ${updated.order_number}, but receipt could not open.`,
+          );
+        }
+      } else {
+        setNotice(`Payment recorded for ${updated.order_number}.`);
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not record payment.");
     } finally {
@@ -377,7 +428,21 @@ export function OnlineOrdersPage() {
 
       mergeOrder(updated);
       setActionNote("");
-      setNotice(`${updated.order_number} updated: ${titleize(updated.fulfillment_status)}.`);
+      if (action === "fulfill") {
+        try {
+          const receipt = await getOnlineOrderReceipt(token, updated.id);
+          setReceiptViewer(receipt);
+          setNotice(`${updated.order_number} fulfilled. Receipt is ready.`);
+        } catch (receiptError) {
+          setNotice(
+            receiptError instanceof Error
+              ? `${updated.order_number} fulfilled, but receipt could not open: ${receiptError.message}`
+              : `${updated.order_number} fulfilled, but receipt could not open.`,
+          );
+        }
+      } else {
+        setNotice(`${updated.order_number} updated: ${titleize(updated.fulfillment_status)}.`);
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not update online order.");
     } finally {
@@ -608,6 +673,26 @@ export function OnlineOrdersPage() {
               </div>
 
               <p className="online-order-next-step">{orderProgressHint(selectedOrder)}</p>
+
+              <div className="online-order-receipt-strip">
+                <div>
+                  <strong>
+                    {isFullyPaid(selectedOrder) ? "Receipt ready" : "Receipt pending"}
+                  </strong>
+                  <span>
+                    {isFullyPaid(selectedOrder)
+                      ? "Open or print the customer receipt after payment confirmation."
+                      : "Collect or confirm full payment to unlock the receipt."}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={!isFullyPaid(selectedOrder) || receiptBusy}
+                  onClick={() => void openOrderReceipt(selectedOrder)}
+                >
+                  {receiptBusy ? "Opening..." : "Open receipt"}
+                </button>
+              </div>
 
               <section className="online-order-subsection">
                 <h3>Items</h3>
@@ -843,6 +928,132 @@ export function OnlineOrdersPage() {
           )}
         </aside>
       </div>
+
+      {receiptViewer && (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="receipt-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Online order receipt"
+          >
+            <header className="receipt-modal__header">
+              <div>
+                <p className="eyebrow">Online order receipt</p>
+                <h2>{receiptViewer.invoice_number}</h2>
+                <span>
+                  {receiptViewer.branch_name} / {receiptViewer.branch_code}
+                </span>
+              </div>
+              <div className="table-actions">
+                <button type="button" onClick={printReceipt}>
+                  Print
+                </button>
+                <button type="button" onClick={() => setReceiptViewer(null)}>
+                  Close
+                </button>
+              </div>
+            </header>
+
+            <div className="receipt-paper">
+              <div className="receipt-brand">
+                <div>
+                  <p className="eyebrow">Crystal-shop online order</p>
+                  <h3>{receiptViewer.branch_name}</h3>
+                  <span>
+                    {receiptViewer.branch_address ??
+                      `${receiptViewer.branch_code} branch`}
+                  </span>
+                </div>
+                <div>
+                  <span>Order number</span>
+                  <strong>{receiptViewer.invoice_number}</strong>
+                  <span>{dateLabel(receiptDate(receiptViewer))}</span>
+                </div>
+              </div>
+
+              <div className="receipt-paper__meta">
+                <div>
+                  <span>Handled by</span>
+                  <strong>{receiptViewer.cashier_name ?? user?.full_name ?? "Staff"}</strong>
+                </div>
+                <div>
+                  <span>Customer</span>
+                  <strong>{receiptViewer.customer_name ?? "Online customer"}</strong>
+                </div>
+                <div>
+                  <span>Phone</span>
+                  <strong>{receiptViewer.customer_phone ?? "Not recorded"}</strong>
+                </div>
+                <div>
+                  <span>Status</span>
+                  <strong>{titleize(receiptViewer.sale_status)}</strong>
+                </div>
+              </div>
+
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Unit</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {receiptViewer.items.map((item) => (
+                    <tr key={item.id}>
+                      <td>{item.description}</td>
+                      <td>{item.quantity}</td>
+                      <td>{money(item.unit_price)}</td>
+                      <td>{money(item.line_total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="receipt-totals">
+                <div>
+                  <span>Subtotal</span>
+                  <strong>{money(receiptViewer.subtotal)}</strong>
+                </div>
+                <div>
+                  <span>Discount</span>
+                  <strong>{money(receiptViewer.discount_amount)}</strong>
+                </div>
+                <div>
+                  <span>Paid</span>
+                  <strong>{money(receiptViewer.paid_amount)}</strong>
+                </div>
+                <div className="receipt-totals__grand">
+                  <span>Total</span>
+                  <strong>{money(receiptViewer.total_amount)}</strong>
+                </div>
+              </div>
+
+              <div className="receipt-payments">
+                <strong>Payments</strong>
+                {receiptViewer.payments.map((payment) => (
+                  <span key={`${payment.method}-${payment.paid_at}-${payment.amount}`}>
+                    {titleize(payment.method)} / {money(payment.amount)}
+                    {payment.provider_reference
+                      ? ` / Ref ${payment.provider_reference}`
+                      : ""}
+                  </span>
+                ))}
+              </div>
+
+              <div className="receipt-footer-note">
+                <strong>Thank you for shopping with us.</strong>
+                <span>
+                  Keep this receipt for order tracking, warranty, returns, and service
+                  support.
+                </span>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   );
 }

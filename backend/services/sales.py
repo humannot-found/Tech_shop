@@ -717,8 +717,7 @@ def cancel_unpaid_sale(
     return sale_response(db, sale)
 
 
-def receipt(db: Session, principal: AuthPrincipal, sale_id: UUID) -> ReceiptResponse:
-    sale = get_sale_model(db, principal, sale_id)
+def receipt_for_sale(db: Session, sale: Sale) -> ReceiptResponse:
     if sale.status in {
         SaleStatus.DRAFT,
         SaleStatus.PENDING_PAYMENT,
@@ -738,6 +737,10 @@ def receipt(db: Session, principal: AuthPrincipal, sale_id: UUID) -> ReceiptResp
         )
         .order_by(Payment.paid_at)
     ).all()
+    receipt_at = sale.completed_at or next(
+        (payment.paid_at for payment in reversed(payments) if payment.paid_at),
+        None,
+    )
     return ReceiptResponse(
         invoice_number=sale.invoice_number,
         sale_status=sale.status,
@@ -767,8 +770,13 @@ def receipt(db: Session, principal: AuthPrincipal, sale_id: UUID) -> ReceiptResp
         discount_amount=sale.discount_amount,
         total_amount=sale.total_amount,
         paid_amount=sale.paid_amount,
-        completed_at=sale.completed_at,
+        completed_at=receipt_at,
     )
+
+
+def receipt(db: Session, principal: AuthPrincipal, sale_id: UUID) -> ReceiptResponse:
+    sale = get_sale_model(db, principal, sale_id)
+    return receipt_for_sale(db, sale)
 
 
 def lookup_warranty(

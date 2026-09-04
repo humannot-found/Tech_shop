@@ -34,11 +34,12 @@ from backend.schemas.online_order_schemas import (
     OnlineOrderResponse,
 )
 from backend.schemas.payments_schemas import PaymentResponse
+from backend.schemas.sales_schemas import ReceiptResponse
 from backend.services.audit import record_audit
 from backend.services.auth import AuthPrincipal
 from backend.services.authorization import enforce_branch_scope, enforce_permission
 from backend.services.exceptions import ConflictError, NotFoundError, ValidationError
-from backend.services.sales import create_warranties_for_sale, money
+from backend.services.sales import create_warranties_for_sale, money, receipt_for_sale
 
 
 def _delivery_field(notes: str | None, key: str) -> str | None:
@@ -238,6 +239,11 @@ def get_order(
     db: Session, principal: AuthPrincipal, sale_id: UUID
 ) -> OnlineOrderResponse:
     return _order_response(db, _online_order_model(db, principal, sale_id))
+
+
+def receipt(db: Session, principal: AuthPrincipal, sale_id: UUID) -> ReceiptResponse:
+    sale = _online_order_model(db, principal, sale_id)
+    return receipt_for_sale(db, sale)
 
 
 def _open_till_session(

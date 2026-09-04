@@ -5179,6 +5179,48 @@ button:disabled {
   line-height: 1.45;
 }
 
+.online-order-receipt-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.online-order-receipt-strip div {
+  display: grid;
+  gap: 3px;
+}
+
+.online-order-receipt-strip strong {
+  color: var(--text);
+}
+
+.online-order-receipt-strip span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.online-order-receipt-strip button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 800;
+  padding: 0 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.online-order-receipt-strip button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .online-order-subsection {
   display: grid;
   gap: 10px;
@@ -5262,6 +5304,11 @@ button:disabled {
   .online-order-money-strip,
   .online-order-action-grid {
     grid-template-columns: 1fr;
+  }
+
+  .online-order-receipt-strip {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .online-order-payment-row {
