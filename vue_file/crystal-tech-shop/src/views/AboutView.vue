@@ -377,7 +377,8 @@ const values = [
 }
 
 .visit-section {
-  background: #17181c;
+  background: #f7f5f2;
+  padding: 0 32px 72px;
 }
 
 .visit-inner {
@@ -385,20 +386,23 @@ const values = [
   grid-template-columns: minmax(0, 1.1fr) minmax(260px, 0.9fr) auto;
   gap: 32px;
   align-items: center;
-  padding-top: 46px;
-  padding-bottom: 46px;
-  color: #fff;
+  border: 1px solid #e1dfdc;
+  border-radius: 8px;
+  padding: 38px 32px;
+  background: #fff;
+  color: #17181c;
+  box-shadow: 0 18px 45px rgba(23, 24, 28, 0.06);
 }
 
 .visit-text h2 {
-  color: #fff;
+  color: #17181c;
   font-size: 27px;
 }
 
 .visit-text > p {
   max-width: 520px;
   margin: 14px 0 0;
-  color: rgba(255, 255, 255, 0.72);
+  color: #4a4a4d;
   font-size: 13.5px;
   line-height: 1.7;
 }
@@ -413,7 +417,7 @@ const values = [
   display: flex;
   align-items: center;
   gap: 9px;
-  color: rgba(255, 255, 255, 0.86);
+  color: #2b2d33;
   font-size: 13px;
 }
 
@@ -459,10 +463,19 @@ const values = [
 }
 
 @media (max-width: 680px) {
+  .visit-section {
+    padding-right: 18px;
+    padding-bottom: 48px;
+    padding-left: 18px;
+  }
+
+  .visit-inner {
+    padding: 26px 20px;
+  }
+
   .about-hero,
   .stats-row,
-  .values-section,
-  .visit-inner {
+  .values-section {
     padding-right: 18px;
     padding-left: 18px;
   }
