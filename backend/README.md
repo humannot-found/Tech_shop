@@ -177,7 +177,19 @@ sale voids, and returns. Reports are calculated from live operational records ra
 stored totals, remain branch-scoped for non-Admin staff, and allow technicians to view
 only their own assigned repair report scope.
 
-The next implementation slice is frontend integration for online orders: the Vue website
-can call the public catalog, checkout, M-Pesa prompt, and payment-status endpoints, while
-the staff frontend can add an online-order queue for packing and fulfillment. Deployment,
-permanent image storage, and full redesign work remain parked for later client review.
+## Deployment notes
+
+The backend Docker image runs database migrations before starting FastAPI. On Render,
+deploy the backend as a Docker web service with `Dockerfile.backend`, set the health
+check path to `/health`, and leave Docker Command blank unless you intentionally need an
+override. The Dockerfile `CMD` binds Uvicorn to Render's `PORT` environment variable.
+
+If you do override the command on Render, run multiple commands through a shell:
+
+```bash
+/bin/sh -c "alembic upgrade head && exec uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+```
+
+Do not enter `alembic upgrade head && uvicorn ...` by itself, because Render will pass the
+`&& uvicorn ...` text to Alembic as extra arguments instead of interpreting it as shell
+syntax.
