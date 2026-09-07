@@ -13,10 +13,10 @@ const quickLinks = [
 ]
 
 const policies = [
-  { label: 'Terms of Service', to: '/policies/terms' },
-  { label: 'Privacy Policy', to: '/policies/privacy' },
   { label: 'Returns & Refunds', to: '/policies/returns' },
   { label: 'Warranty Policy', to: '/policies/warranty' },
+  { label: 'Shipping & Delivery', to: '/policies/shipping' },
+  { label: 'Privacy Policy', to: '/policies/privacy' },
 ]
 </script>
 

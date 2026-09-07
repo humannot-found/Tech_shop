@@ -70,7 +70,7 @@ const routes = [
   {
     path: '/policies/:page',
     name: 'policy',
-    component: () => import('@/views/SupportView.vue'), // TODO: replace with PolicyView.vue
+    component: () => import('@/views/PolicyView.vue'),
   },
   {
     path: '/:pathMatch(.*)*',
