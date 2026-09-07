@@ -1,13 +1,15 @@
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     app_name: str = "Tech Shop System"
     environment: str = "development"
-    database_url: str = (
-        "postgresql+psycopg2://postgres:postgres@localhost:5432/tech_shop"
+    database_url: str = Field(
+        default="postgresql+psycopg2://postgres:postgres@localhost:5432/tech_shop",
+        validation_alias=AliasChoices("TECH_SHOP_DATABASE_URL", "DATABASE_URL"),
     )
     jwt_secret_key: str = "development-only-change-me"
     jwt_algorithm: str = "HS256"
@@ -28,6 +30,18 @@ class Settings(BaseSettings):
     mpesa_shortcode: str = "174379"
     mpesa_transaction_type: str = "CustomerPayBillOnline"
     mpesa_callback_base_url: str = "http://127.0.0.1:8000"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: str) -> str:
+        if not isinstance(value, str):
+            return value
+        cleaned = value.strip()
+        if cleaned.startswith("postgres://"):
+            return "postgresql+psycopg2://" + cleaned.removeprefix("postgres://")
+        if cleaned.startswith("postgresql://"):
+            return "postgresql+psycopg2://" + cleaned.removeprefix("postgresql://")
+        return cleaned
 
     @property
     def cors_origin_list(self) -> list[str]:

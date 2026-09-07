@@ -184,6 +184,11 @@ deploy the backend as a Docker web service with `Dockerfile.backend`, set the he
 check path to `/health`, and leave Docker Command blank unless you intentionally need an
 override. The Dockerfile `CMD` binds Uvicorn to Render's `PORT` environment variable.
 
+Create a Render PostgreSQL database first, then set the backend database environment
+variable to the database's real Internal Database URL. The app accepts either
+`TECH_SHOP_DATABASE_URL` or `DATABASE_URL`; do not leave placeholder values such as `...`
+in the URL.
+
 If you do override the command on Render, run multiple commands through a shell:
 
 ```bash
