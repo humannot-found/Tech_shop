@@ -1,7 +1,18 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
-import { closeTillSession, openTillSession } from "../../api/client";
-import type { CurrentUser, Till, TillSession } from "../../api/types";
+import {
+  closeTillSession,
+  listCashMovements,
+  openTillSession,
+  recordCashMovement,
+} from "../../api/client";
+import type {
+  CurrentUser,
+  Till,
+  TillCashMovement,
+  TillCashMovementPayload,
+  TillSession,
+} from "../../api/types";
 import { money, tillVariance } from "./utils";
 
 type UseTillOptions = {
@@ -29,6 +40,57 @@ export function useTill({
   const [closeTillOpen, setCloseTillOpen] = useState(false);
   const [lastClosedTill, setLastClosedTill] = useState<TillSession | null>(null);
   const [tillBusy, setTillBusy] = useState(false);
+
+  const [cashMovements, setCashMovements] = useState<TillCashMovement[]>([]);
+  const [cashMovementOpen, setCashMovementOpen] = useState(false);
+  const [cashMovementBusy, setCashMovementBusy] = useState(false);
+
+  useEffect(() => {
+    if (!token || isPreview || !tillSession) {
+      setCashMovements([]);
+      return;
+    }
+    let active = true;
+    listCashMovements(token, tillSession.id)
+      .then((items) => {
+        if (active) setCashMovements(items);
+      })
+      .catch(() => {
+        if (active) setCashMovements([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [token, isPreview, tillSession?.id]);
+
+  async function submitCashMovement(
+    kind: TillCashMovementPayload["kind"],
+    amount: number,
+    reason: string,
+  ) {
+    if (!token || isPreview || !tillSession) {
+      setNotice("Open a live till session before recording cash movements.");
+      return false;
+    }
+    setCashMovementBusy(true);
+    try {
+      const created = await recordCashMovement(token, tillSession.id, {
+        kind,
+        amount,
+        reason,
+      });
+      setCashMovements((current) => [created, ...current]);
+      setNotice(`${money(Number(created.amount))} recorded.`);
+      return true;
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Could not record the cash movement.",
+      );
+      return false;
+    } finally {
+      setCashMovementBusy(false);
+    }
+  }
 
   async function handleOpenTill(event: FormEvent) {
     event.preventDefault();
@@ -116,6 +178,11 @@ export function useTill({
     tillBusy,
     handleOpenTill,
     handleCloseTill,
+    cashMovements,
+    cashMovementOpen,
+    setCashMovementOpen,
+    cashMovementBusy,
+    submitCashMovement,
   };
 }
 

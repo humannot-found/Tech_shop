@@ -5701,3 +5701,91 @@ button:disabled {
   background: #fff;
   font-weight: 700;
 }
+
+/* Till cash movements */
+
+.till-close-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cash-movement-modal {
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+}
+
+.cash-movement-form {
+  display: grid;
+  gap: 10px;
+}
+
+.cash-movement-form small {
+  color: var(--muted);
+}
+
+.cash-movement-kinds {
+  display: flex;
+  gap: 6px;
+}
+
+.cash-movement-kinds button {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  font-weight: 700;
+}
+
+.cash-movement-kinds button.is-active {
+  color: #fff;
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.cash-movement-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.cash-movement-totals strong {
+  color: var(--text);
+}
+
+.cash-movement-list {
+  display: grid;
+  gap: 6px;
+}
+
+.cash-movement-list > span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.cash-movement-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-soft);
+}
+
+.cash-movement-list article div {
+  display: grid;
+  gap: 1px;
+}
+
+.cash-movement-list small,
+.cash-movement-list article span {
+  color: var(--muted);
+  font-size: 12px;
+}

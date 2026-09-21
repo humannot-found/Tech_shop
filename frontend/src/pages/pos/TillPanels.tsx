@@ -27,6 +27,7 @@ export function TillPanels({
     handleOpenTill,
     handleCloseTill,
     tillSession,
+    setCashMovementOpen,
   } = till;
 
   return (
@@ -78,15 +79,23 @@ export function TillPanels({
             </span>
           </div>
           {!closeTillOpen ? (
-            <button
-              className="secondary-button"
-              onClick={() => {
-                setCloseTillOpen(true);
-                setClosingCash(tillSession.expected_cash ?? "");
-              }}
-            >
-              Close Till
-            </button>
+            <div className="till-close-panel__actions">
+              <button
+                type="button"
+                onClick={() => setCashMovementOpen(true)}
+              >
+                Cash in / out
+              </button>
+              <button
+                className="secondary-button"
+                onClick={() => {
+                  setCloseTillOpen(true);
+                  setClosingCash(tillSession.expected_cash ?? "");
+                }}
+              >
+                Close Till
+              </button>
+            </div>
           ) : (
             <form onSubmit={handleCloseTill}>
               <label>

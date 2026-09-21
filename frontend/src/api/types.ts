@@ -690,6 +690,20 @@ export type WarrantyLookup = ModelResponse & {
   customer_phone: string | null;
 };
 
+export type TillCashMovement = ModelResponse & {
+  till_session_id: UUID;
+  kind: "cash_in" | "paid_out" | "cash_drop";
+  amount: string;
+  reason: string;
+  created_by_id: UUID;
+};
+
+export type TillCashMovementPayload = {
+  kind: TillCashMovement["kind"];
+  amount: number;
+  reason: string;
+};
+
 export type StockAdjustmentPayload = {
   branch_id: UUID;
   variant_id: UUID;

@@ -49,6 +49,8 @@ import type {
   SaleReturnPayload,
   SaleVoidPayload,
   WarrantyLookup,
+  TillCashMovement,
+  TillCashMovementPayload,
   ProductVariant,
   ProductVariantCreatePayload,
   ProductVariantUpdatePayload,
@@ -455,6 +457,24 @@ export function listPosSales(
       status: options?.status,
     },
   });
+}
+
+export function listCashMovements(token: string, sessionId: string) {
+  return apiRequest<TillCashMovement[]>(
+    `/pos/till-sessions/${sessionId}/cash-movements`,
+    { token },
+  );
+}
+
+export function recordCashMovement(
+  token: string,
+  sessionId: string,
+  body: TillCashMovementPayload,
+) {
+  return apiRequest<TillCashMovement>(
+    `/pos/till-sessions/${sessionId}/cash-movements`,
+    { token, method: "POST", body },
+  );
 }
 
 export function searchWarranties(token: string, query: string) {

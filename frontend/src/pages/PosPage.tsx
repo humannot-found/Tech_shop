@@ -19,6 +19,7 @@ import { ToastNotice } from "../components/ToastNotice";
 import { mockProducts } from "../data/mockProducts";
 import { useAuth } from "../state/auth";
 import { ApprovalsTab } from "./pos/ApprovalsTab";
+import { CashMovementModal } from "./pos/CashMovementModal";
 import { HeldOrdersTab } from "./pos/HeldOrdersTab";
 import { OrderPanel } from "./pos/OrderPanel";
 import { PaymentModal } from "./pos/PaymentModal";
@@ -346,7 +347,9 @@ export function PosPage({
   }
 
   function closeTopDialog() {
-    if (approvalOpen) {
+    if (till.cashMovementOpen) {
+      till.setCashMovementOpen(false);
+    } else if (approvalOpen) {
       cancelDiscountApproval();
     } else if (adjustments.returnSale) {
       adjustments.closeReturn();
@@ -618,6 +621,15 @@ export function PosPage({
           busy={adjustments.adjustBusy}
           onSubmit={adjustments.submitVoid}
           onClose={adjustments.closeVoid}
+        />
+      )}
+
+      {till.cashMovementOpen && (
+        <CashMovementModal
+          movements={till.cashMovements}
+          busy={till.cashMovementBusy}
+          onSubmit={till.submitCashMovement}
+          onClose={() => till.setCashMovementOpen(false)}
         />
       )}
 
