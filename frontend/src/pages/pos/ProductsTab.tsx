@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode, RefObject } from "react";
 
 import type { PosProduct } from "../../api/types";
+import { posShortcutHints } from "./usePosShortcuts";
 import { money } from "./utils";
 
 type ProductsTabProps = {
@@ -13,6 +14,9 @@ type ProductsTabProps = {
   setActiveCategory: (category: string) => void;
   showProductInformationHint: () => void;
   addToCart: (product: PosProduct) => void;
+  searchInputRef: RefObject<HTMLInputElement | null>;
+  onScan: (code: string) => void;
+  scanBusy: boolean;
   children: ReactNode;
 };
 
@@ -26,6 +30,9 @@ export function ProductsTab({
   setActiveCategory,
   showProductInformationHint,
   addToCart,
+  searchInputRef,
+  onScan,
+  scanBusy,
   children,
 }: ProductsTabProps) {
   return (
@@ -37,8 +44,16 @@ export function ProductsTab({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search products, SKU, barcode"
+              placeholder="Search, or scan a barcode / IMEI and press Enter"
               autoFocus
+              ref={searchInputRef}
+              aria-busy={scanBusy}
+              onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  onScan(query);
+                }
+              }}
             />
           </label>
           <button
@@ -49,6 +64,14 @@ export function ProductsTab({
             <strong>{filtered.length}</strong>
             <span>{catalogLive ? "Live catalog" : "Sample catalog"}</span>
           </button>
+        </div>
+
+        <div className="pos-shortcut-hints" aria-label="Keyboard shortcuts">
+          {posShortcutHints.map((hint) => (
+            <span key={hint.key}>
+              <kbd>{hint.key}</kbd> {hint.label}
+            </span>
+          ))}
         </div>
 
         <div className="category-list">

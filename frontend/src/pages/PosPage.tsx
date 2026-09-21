@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ApiError,
@@ -38,6 +38,7 @@ import type {
 import { usePosCheckout } from "./pos/usePosCheckout";
 import { useRepairDesk } from "./pos/useRepairDesk";
 import { useSaleAdjustments } from "./pos/useSaleAdjustments";
+import { usePosShortcuts } from "./pos/usePosShortcuts";
 import { useTill } from "./pos/useTill";
 import { VoidModal } from "./pos/VoidModal";
 import { WarrantyTab } from "./pos/WarrantyTab";
@@ -61,6 +62,8 @@ export function PosPage({
   const [historySearch, setHistorySearch] = useState("");
   const [historyBusy, setHistoryBusy] = useState(false);
 
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [scanBusy, setScanBusy] = useState(false);
   const [serializedUnitsByVariant, setSerializedUnitsByVariant] = useState<
     Record<string, SerializedUnit[]>
   >({});
@@ -198,7 +201,12 @@ export function PosPage({
       listCatalogProducts(token, query || "demo"),
       currentTillSession(token),
       user?.branch_id ? listTills(token, user.branch_id) : Promise.resolve([]),
-      user?.branch_id ? listSerializedUnits(token, user.branch_id) : Promise.resolve({ items: [] }),
+      user?.branch_id
+        ? listSerializedUnits(token, user.branch_id, "", {
+            status: "available",
+            pageSize: 200,
+          })
+        : Promise.resolve({ items: [] }),
     ]).then(([catalogResult, tillResult, tillsResult, unitsResult]) => {
       if (!active) return;
 
@@ -327,6 +335,127 @@ export function PosPage({
     }
   }
 
+  function focusSearch() {
+    setActiveWorkspaceTab("products");
+    window.setTimeout(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    }, 0);
+  }
+
+  function closeTopDialog() {
+    if (approvalOpen) {
+      cancelDiscountApproval();
+    } else if (adjustments.returnSale) {
+      adjustments.closeReturn();
+    } else if (adjustments.voidSale) {
+      adjustments.closeVoid();
+    } else if (receiptViewer) {
+      setReceiptViewer(null);
+    } else if (repairReceiptViewer) {
+      setRepairReceiptViewer(null);
+    } else if (paymentOpen && !paymentBusy) {
+      setPaymentOpen(false);
+    } else {
+      return false;
+    }
+    return true;
+  }
+
+  usePosShortcuts({
+    focusSearch,
+    openPayment,
+    holdOrder: holdCurrentOrder,
+    newOrder: startNewOrder,
+    closeTopDialog,
+  });
+
+  async function findProductForVariant(variantId: string, sku: string) {
+    const loaded = products.find((product) => product.variantId === variantId);
+    if (loaded || !token) return loaded ?? null;
+    const page = await listCatalogProducts(token, sku);
+    return (
+      productsFromApi(page.items).find((product) => product.variantId === variantId) ??
+      null
+    );
+  }
+
+  function scanned(message: string) {
+    setQuery("");
+    setNotice(message);
+    searchInputRef.current?.focus();
+  }
+
+  /** Resolves a scanned or typed code: an exact IMEI/serial first, then a barcode or SKU. */
+  async function handleScan(rawCode: string) {
+    const code = rawCode.trim();
+    if (!code || scanBusy) return;
+    const lowered = code.toLowerCase();
+
+    if (!token || isPreview || !user?.branch_id) {
+      const local = products.find(
+        (product) =>
+          product.sku.toLowerCase() === lowered || product.barcode === code,
+      );
+      if (local) {
+        addToCart(local);
+        scanned(`${local.name} added.`);
+      } else {
+        setNotice(`No sample product matches "${code}".`);
+      }
+      return;
+    }
+
+    setScanBusy(true);
+    try {
+      const unitPage = await listSerializedUnits(token, user.branch_id, code, {
+        pageSize: 10,
+      });
+      const unit = unitPage.items.find(
+        (candidate) =>
+          candidate.imei === code || candidate.serial_number?.toLowerCase() === lowered,
+      );
+      if (unit) {
+        if (unit.status !== "available") {
+          setNotice(
+            `${unit.imei ?? unit.serial_number} is ${unit.status.replace(/_/g, " ")} and cannot be sold.`,
+          );
+          return;
+        }
+        const product = await findProductForVariant(unit.variant_id, unit.sku);
+        if (!product) {
+          setNotice(`Found the unit, but ${unit.product_name} is not sellable in the catalog.`);
+          return;
+        }
+        setSerializedUnitsByVariant((current) => {
+          const existing = current[unit.variant_id] ?? [];
+          return existing.some((item) => item.id === unit.id)
+            ? current
+            : { ...current, [unit.variant_id]: [...existing, unit] };
+        });
+        addToCart(product, unit);
+        scanned(`${product.name} added (${unit.imei ?? unit.serial_number}).`);
+        return;
+      }
+
+      const catalogPage = await listCatalogProducts(token, code);
+      const match = productsFromApi(catalogPage.items).find(
+        (product) =>
+          product.barcode === code || product.sku.toLowerCase() === lowered,
+      );
+      if (match) {
+        addToCart(match);
+        scanned(`${match.name} added.`);
+      } else {
+        setNotice(`No product or available unit matches "${code}".`);
+      }
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not look up that code.");
+    } finally {
+      setScanBusy(false);
+    }
+  }
+
   function showProductInformationHint() {
     setNotice(
       `${filtered.length} product(s) visible. Click a product to add it, or open Catalog for full specs, images, and pricing setup.`,
@@ -422,6 +551,9 @@ export function PosPage({
             setActiveCategory={setActiveCategory}
             showProductInformationHint={showProductInformationHint}
             addToCart={addToCart}
+            searchInputRef={searchInputRef}
+            onScan={(code) => void handleScan(code)}
+            scanBusy={scanBusy}
           >
             <TillPanels till={till} />
           </ProductsTab>

@@ -5643,3 +5643,24 @@ button:disabled {
   display: flex;
   gap: 8px;
 }
+
+/* Keyboard shortcut hints */
+
+.pos-shortcut-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pos-shortcut-hints kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel-soft);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+}

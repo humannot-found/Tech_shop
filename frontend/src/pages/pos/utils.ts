@@ -82,6 +82,7 @@ export function productsFromApi(products: CatalogProduct[]): PosProduct[] {
       sku: variant.sku,
       category: product.warranty_months ? "Devices" : "Accessories",
       price: Number(variant.selling_price),
+      barcode: variant.barcode,
       trackingType: variant.tracking_type,
       stockHint:
         variant.tracking_type === "bulk"

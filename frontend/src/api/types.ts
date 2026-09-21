@@ -446,6 +446,7 @@ export type PosProduct = {
   sku: string;
   category: string;
   price: number;
+  barcode?: string | null;
   trackingType: "bulk" | "serial" | "imei";
   stockHint: string;
   accent: string;

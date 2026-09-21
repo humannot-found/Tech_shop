@@ -322,7 +322,7 @@ export function usePosCheckout({
     };
   }
 
-  function addToCart(product: PosProduct) {
+  function addToCart(product: PosProduct, chosenUnit?: SerializedUnit) {
     setPendingSale(null);
     setReceipt(null);
 
@@ -330,9 +330,15 @@ export function usePosCheckout({
       const usedUnitIds = new Set(
         cart.map((item) => item.serializedUnitId).filter(Boolean),
       );
-      const unit = (serializedUnitsByVariant[product.variantId] ?? []).find(
-        (candidate) => !usedUnitIds.has(candidate.id),
-      );
+      if (chosenUnit && usedUnitIds.has(chosenUnit.id)) {
+        setNotice("That IMEI/serial unit is already in the cart.");
+        return;
+      }
+      const unit =
+        chosenUnit ??
+        (serializedUnitsByVariant[product.variantId] ?? []).find(
+          (candidate) => !usedUnitIds.has(candidate.id),
+        );
 
       if (!unit && token && !isPreview) {
         setNotice(`No available ${product.trackingType.toUpperCase()} unit found for ${product.name}.`);
