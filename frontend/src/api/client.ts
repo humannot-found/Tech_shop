@@ -48,6 +48,7 @@ import type {
   SaleReturn,
   SaleReturnPayload,
   SaleVoidPayload,
+  WarrantyLookup,
   ProductVariant,
   ProductVariantCreatePayload,
   ProductVariantUpdatePayload,
@@ -453,6 +454,13 @@ export function listPosSales(
       page_size: options?.pageSize ?? 12,
       status: options?.status,
     },
+  });
+}
+
+export function lookupWarranty(token: string, identifier: string) {
+  return apiRequest<WarrantyLookup>("/pos/warranties/lookup", {
+    token,
+    query: { identifier },
   });
 }
 

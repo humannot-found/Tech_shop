@@ -40,6 +40,7 @@ import { useRepairDesk } from "./pos/useRepairDesk";
 import { useSaleAdjustments } from "./pos/useSaleAdjustments";
 import { useTill } from "./pos/useTill";
 import { VoidModal } from "./pos/VoidModal";
+import { WarrantyTab } from "./pos/WarrantyTab";
 import { productsFromApi } from "./pos/utils";
 
 export function PosPage({
@@ -378,6 +379,7 @@ export function PosPage({
               ["receipts", "Receipts"],
               ["repair_pickups", "Repair Pickups"],
               ["held", "Held Orders"],
+              ["warranty", "Warranty"],
               ...(adjustments.canReview ? [["approvals", "Approvals"]] : []),
             ].map(([tab, label]) => (
               <button
@@ -447,6 +449,10 @@ export function PosPage({
 
         {activeWorkspaceTab === "repair_pickups" && (
           <RepairPickupsTab desk={repairDesk} tillSession={tillSession} />
+        )}
+
+        {activeWorkspaceTab === "warranty" && (
+          <WarrantyTab onOpenReceipt={openReceiptViewer} />
         )}
 
         {activeWorkspaceTab === "approvals" && adjustments.canReview && (

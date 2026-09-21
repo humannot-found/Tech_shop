@@ -671,6 +671,24 @@ export type SaleVoidPayload = {
   reason: string;
 };
 
+export type WarrantyLookup = ModelResponse & {
+  sale_item_id: UUID;
+  serialized_unit_id: UUID | null;
+  customer_id: UUID | null;
+  start_date: string;
+  end_date: string;
+  status: string;
+  coverage: string;
+  days_remaining: number;
+  unit_identifier: string | null;
+  description: string;
+  sale_id: UUID;
+  invoice_number: string;
+  sold_at: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+};
+
 export type StockAdjustmentPayload = {
   branch_id: UUID;
   variant_id: UUID;

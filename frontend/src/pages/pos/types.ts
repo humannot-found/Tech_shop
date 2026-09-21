@@ -22,6 +22,7 @@ export type PosWorkspaceTab =
   | "receipts"
   | "repair_pickups"
   | "held"
+  | "warranty"
   | "approvals";
 export type SalesHistoryStatus = "all" | "completed" | "pending_payment" | "cancelled";
 export type SplitBalanceState = "ready" | "remaining" | "over";
