@@ -393,6 +393,16 @@ def request_sale_return(
     return item
 
 
+@router.get("/returns", response_model=list[SaleReturnResponse])
+def list_branch_returns(
+    branch_id: UUID,
+    principal: ReturnApprovePrincipal,
+    db: DatabaseSession,
+    return_status: str | None = Query(default=None, alias="status", max_length=20),
+) -> list[SaleReturnResponse]:
+    return return_service.list_branch_returns(db, principal, branch_id, return_status)
+
+
 @router.post("/returns/{return_id}/decision", response_model=SaleReturnResponse)
 def decide_sale_return(
     return_id: UUID,

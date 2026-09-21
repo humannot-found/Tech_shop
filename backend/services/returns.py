@@ -18,7 +18,7 @@ from backend.models.enums import (
 )
 from backend.models.payments import Payment
 from backend.models.products import ProductVariant
-from backend.models.sales import SaleItem, SaleReturn, SaleReturnItem, Till, TillSession
+from backend.models.sales import Sale, SaleItem, SaleReturn, SaleReturnItem, Till, TillSession
 from backend.models.warranty import Warranty
 from backend.schemas.approval_schemas import ApprovalDecision, ApprovalRequestResponse
 from backend.schemas.sales_schemas import (
@@ -111,6 +111,26 @@ def list_returns(
         .order_by(SaleReturn.created_at.desc())
     ).all()
     return [_response(db, item) for item in rows]
+
+
+def list_branch_returns(
+    db: Session,
+    principal: AuthPrincipal,
+    branch_id: UUID,
+    status: str | None = None,
+) -> list[SaleReturnResponse]:
+    enforce_permission(principal, "returns.approve")
+    enforce_branch_scope(principal, branch_id)
+    statement = (
+        select(SaleReturn)
+        .join(Sale, Sale.id == SaleReturn.sale_id)
+        .where(Sale.branch_id == branch_id, SaleReturn.is_deleted.is_(False))
+        .order_by(SaleReturn.created_at.desc())
+        .limit(100)
+    )
+    if status is not None:
+        statement = statement.where(SaleReturn.status == status)
+    return [_response(db, item) for item in db.scalars(statement).all()]
 
 
 def request_return(

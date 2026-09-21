@@ -55,6 +55,7 @@ def test_pos_routes_are_exposed() -> None:
     assert "/api/v1/staff/pos/sales/{sale_id}/void-requests" in paths
     assert "/api/v1/staff/pos/sales/{sale_id}/returns" in paths
     assert "/api/v1/staff/pos/warranties/lookup" in paths
+    assert "/api/v1/staff/pos/returns" in paths
 
 
 def test_cashier_can_list_own_branch_sales(monkeypatch) -> None:
@@ -148,3 +149,9 @@ def test_branch_manager_can_discount_but_cashier_cannot() -> None:
     by_code = {item.code: item for item in ROLE_DEFINITIONS}
     assert "sales.discount" in by_code[BRANCH_MANAGER].permissions
     assert "sales.discount" not in by_code[CASHIER].permissions
+
+
+def test_cashier_cannot_list_branch_returns() -> None:
+    actor = principal(CASHIER, {"sales.process"})
+    with pytest.raises(AuthorizationError):
+        return_service.list_branch_returns(object(), actor, actor.branch_id)
