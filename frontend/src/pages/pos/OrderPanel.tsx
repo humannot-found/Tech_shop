@@ -1,6 +1,8 @@
+import { useState } from "react";
+
 import type { SerializedUnit } from "../../api/types";
-import type { CartItem, PaymentMethod } from "./types";
-import { money, unitLabel } from "./utils";
+import type { CartItem, DiscountMode, PaymentMethod } from "./types";
+import { lineDiscountFromInput, money, unitLabel } from "./utils";
 
 type OrderPanelProps = {
   cart: CartItem[];
@@ -21,7 +23,7 @@ type OrderPanelProps = {
   serializedUnitsByVariant: Record<string, SerializedUnit[]>;
   updateSerializedUnit: (lineId: string, unitId: string) => void;
   updateQuantity: (lineId: string, delta: number) => void;
-  explainOrderControl: (control: "Qty" | "Price" | "Disc %" | "Disc KES") => void;
+  setLineDiscount: (lineId: string, discountAmount: number) => void;
   openPaymentWithMethod: (method: PaymentMethod) => void;
   openPayment: () => void;
   clearCurrentCart: () => void;
@@ -47,12 +49,42 @@ export function OrderPanel({
   serializedUnitsByVariant,
   updateSerializedUnit,
   updateQuantity,
-  explainOrderControl,
+  setLineDiscount,
   openPaymentWithMethod,
   openPayment,
   clearCurrentCart,
   holdCurrentOrder,
 }: OrderPanelProps) {
+  const [editingLineId, setEditingLineId] = useState<string | null>(null);
+  const [discountMode, setDiscountMode] = useState<DiscountMode>("percent");
+  const [discountValue, setDiscountValue] = useState("");
+  const [discountError, setDiscountError] = useState<string | null>(null);
+
+  function openDiscountEditor(item: CartItem) {
+    if (editingLineId === item.lineId) {
+      setEditingLineId(null);
+      return;
+    }
+    setEditingLineId(item.lineId);
+    setDiscountMode("amount");
+    setDiscountValue(item.discountAmount > 0 ? String(item.discountAmount) : "");
+    setDiscountError(null);
+  }
+
+  function applyDiscount(item: CartItem) {
+    const result = lineDiscountFromInput(
+      discountMode,
+      discountValue,
+      item.price * item.quantity,
+    );
+    if ("error" in result) {
+      setDiscountError(result.error);
+      return;
+    }
+    setLineDiscount(item.lineId, result.amount);
+    setEditingLineId(null);
+  }
+
   return (
     <aside className="pos-order-panel">
       <header className="order-tabs">
@@ -140,7 +172,14 @@ export function OrderPanel({
             <div className="order-line__meta">
               <div>
                 <h3>{item.name}</h3>
-                <strong>{money(item.price * item.quantity)}</strong>
+                <strong>
+                  {item.discountAmount > 0 && (
+                    <s className="order-line__was">
+                      {money(item.price * item.quantity)}
+                    </s>
+                  )}
+                  {money(item.price * item.quantity - item.discountAmount)}
+                </strong>
               </div>
               <small>
                 {item.sku} / {item.variantName}
@@ -175,7 +214,66 @@ export function OrderPanel({
                 <button onClick={() => updateQuantity(item.lineId, -item.quantity)}>
                   Remove
                 </button>
+                <button
+                  type="button"
+                  className={item.discountAmount > 0 ? "is-active" : ""}
+                  onClick={() => openDiscountEditor(item)}
+                >
+                  {item.discountAmount > 0
+                    ? `Discount -${money(item.discountAmount)}`
+                    : "Discount"}
+                </button>
               </div>
+
+              {editingLineId === item.lineId && (
+                <form
+                  className="line-discount-editor"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    applyDiscount(item);
+                  }}
+                >
+                  <select
+                    aria-label="Discount type"
+                    value={discountMode}
+                    onChange={(event) => {
+                      setDiscountMode(event.target.value as DiscountMode);
+                      setDiscountError(null);
+                    }}
+                  >
+                    <option value="percent">Percent off (%)</option>
+                    <option value="amount">Amount off (KES)</option>
+                    <option value="price">New line price (KES)</option>
+                  </select>
+                  <input
+                    aria-label="Discount value"
+                    type="number"
+                    min="0"
+                    step="any"
+                    autoFocus
+                    value={discountValue}
+                    onChange={(event) => {
+                      setDiscountValue(event.target.value);
+                      setDiscountError(null);
+                    }}
+                  />
+                  <button type="submit" className="success-button">
+                    Apply
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLineDiscount(item.lineId, 0);
+                      setEditingLineId(null);
+                    }}
+                  >
+                    Clear
+                  </button>
+                  {discountError && (
+                    <span className="line-discount-editor__error">{discountError}</span>
+                  )}
+                </form>
+              )}
             </div>
           </article>
         ))}
@@ -197,19 +295,7 @@ export function OrderPanel({
           </div>
         </div>
 
-        <div className="order-keypad-actions">
-          {(["Qty", "Price", "Disc %", "Disc KES"] as const).map((control) => (
-            <button
-              key={control}
-              type="button"
-              onClick={() => explainOrderControl(control)}
-            >
-              {control}
-            </button>
-          ))}
-        </div>
-
-        <div className="quick-payment-actions" aria-label="Quick payment methods">
+          <div className="quick-payment-actions" aria-label="Quick payment methods">
           <button type="button" onClick={() => openPaymentWithMethod("cash")}>
             Cash
           </button>

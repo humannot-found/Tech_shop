@@ -26,6 +26,7 @@ import { ReceiptModal } from "./pos/ReceiptModal";
 import { ReceiptsTab } from "./pos/ReceiptsTab";
 import { RepairInvoiceModal } from "./pos/RepairInvoiceModal";
 import { RepairPickupsTab } from "./pos/RepairPickupsTab";
+import { SupervisorApprovalModal } from "./pos/SupervisorApprovalModal";
 import { TillPanels } from "./pos/TillPanels";
 import type {
   PosPageProps,
@@ -160,6 +161,10 @@ export function PosPage({
     addToCart,
     updateQuantity,
     updateSerializedUnit,
+    setLineDiscount,
+    approvalOpen,
+    approveDiscount,
+    cancelDiscountApproval,
     openPayment,
     openPaymentWithMethod,
     manuallyCompleteMpesaPayment,
@@ -308,19 +313,6 @@ export function PosPage({
     }
   }
 
-  function explainOrderControl(control: "Qty" | "Price" | "Disc %" | "Disc KES") {
-    if (control === "Qty") {
-      setNotice(
-        "Use the + and - buttons on each cart line. Serialized/IMEI items are added one physical unit at a time.",
-      );
-      return;
-    }
-
-    setNotice(
-      `${control} controls will be enabled once manager price and discount approval rules are switched on.`,
-    );
-  }
-
   function showProductInformationHint() {
     setNotice(
       `${filtered.length} product(s) visible. Click a product to add it, or open Catalog for full specs, images, and pricing setup.`,
@@ -358,7 +350,7 @@ export function PosPage({
         serializedUnitsByVariant={serializedUnitsByVariant}
         updateSerializedUnit={updateSerializedUnit}
         updateQuantity={updateQuantity}
-        explainOrderControl={explainOrderControl}
+        setLineDiscount={setLineDiscount}
         openPaymentWithMethod={openPaymentWithMethod}
         openPayment={openPayment}
         clearCurrentCart={clearCurrentCart}
@@ -446,6 +438,14 @@ export function PosPage({
           />
         )}
       </section>
+
+      {approvalOpen && (
+        <SupervisorApprovalModal
+          discount={discount}
+          onApprove={approveDiscount}
+          onCancel={cancelDiscountApproval}
+        />
+      )}
 
       {receiptViewer && (
         <ReceiptModal

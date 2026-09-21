@@ -211,12 +211,18 @@ export type PosSaleItemCreatePayload = {
   discount_amount?: string | number;
 };
 
+export type DiscountApprovalPayload = {
+  username: string;
+  password: string;
+};
+
 export type PosSaleCreatePayload = {
   branch_id: UUID;
   customer_id?: UUID | null;
   till_session_id: UUID;
   channel: "pos";
   notes?: string | null;
+  discount_approval?: DiscountApprovalPayload | null;
   items: PosSaleItemCreatePayload[];
 };
 

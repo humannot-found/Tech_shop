@@ -17,6 +17,7 @@ import {
 } from "../../api/client";
 import type {
   CurrentUser,
+  DiscountApprovalPayload,
   Customer,
   Payment,
   PosProduct,
@@ -34,6 +35,7 @@ import type {
   SplitMethod,
 } from "./types";
 import {
+  canDiscountWithoutApproval,
   idempotencyKey,
   money,
   mpesaPollSchedule,
@@ -92,12 +94,15 @@ export function usePosCheckout({
   const [receiptViewer, setReceiptViewer] = useState<Receipt | null>(null);
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
   const [pendingSale, setPendingSale] = useState<PosSale | null>(null);
+  const [discountApproval, setDiscountApproval] =
+    useState<DiscountApprovalPayload | null>(null);
+  const [approvalOpen, setApprovalOpen] = useState(false);
 
   const subtotal = cart.reduce(
     (total, item) => total + item.price * item.quantity,
     0,
   );
-  const discount = 0;
+  const discount = cart.reduce((total, item) => total + item.discountAmount, 0);
   const total = Math.max(0, subtotal - discount);
   const paymentSubtotal = pendingSale ? Number(pendingSale.subtotal) : subtotal;
   const paymentDiscount = pendingSale ? Number(pendingSale.discount_amount) : discount;
@@ -170,6 +175,8 @@ export function usePosCheckout({
 
   function clearDraftOrder(message = "Cart cleared.") {
     setCart([]);
+    setDiscountApproval(null);
+    setApprovalOpen(false);
     setCustomerName("");
     setCustomerPhone("");
     setPendingSale(null);
@@ -339,6 +346,7 @@ export function usePosCheckout({
           lineId: `${product.variantId}:${unit?.id ?? Date.now()}`,
           quantity: 1,
           serializedUnitId: unit?.id ?? null,
+          discountAmount: 0,
         },
       ]);
       return;
@@ -357,7 +365,13 @@ export function usePosCheckout({
       }
       return [
         ...current,
-        { ...product, lineId: product.variantId, quantity: 1, serializedUnitId: null },
+        {
+          ...product,
+          lineId: product.variantId,
+          quantity: 1,
+          serializedUnitId: null,
+          discountAmount: 0,
+        },
       ];
     });
   }
@@ -373,9 +387,33 @@ export function usePosCheckout({
             setNotice("Serialized/IMEI products are added one physical unit at a time.");
             return item;
           }
-          return { ...item, quantity: Math.max(0, item.quantity + delta) };
+          const quantity = Math.max(0, item.quantity + delta);
+          // Keep the per-unit discount the cashier chose when the quantity changes.
+          const discountAmount = item.quantity
+            ? Math.round(((item.discountAmount / item.quantity) * quantity) * 100) / 100
+            : 0;
+          return { ...item, quantity, discountAmount };
         })
         .filter((item) => item.quantity > 0),
+    );
+  }
+
+  function setLineDiscount(lineId: string, discountAmount: number) {
+    setPendingSale(null);
+    setReceipt(null);
+    setDiscountApproval(null);
+    setCart((current) =>
+      current.map((item) =>
+        item.lineId === lineId
+          ? {
+              ...item,
+              discountAmount: Math.min(
+                Math.max(0, discountAmount),
+                item.price * item.quantity,
+              ),
+            }
+          : item,
+      ),
     );
   }
 
@@ -416,7 +454,29 @@ export function usePosCheckout({
       setNotice(`Select the IMEI/serial unit for ${missingUnit.name} before payment.`);
       return;
     }
+    if (
+      token &&
+      !isPreview &&
+      !pendingSale &&
+      discount > 0 &&
+      !discountApproval &&
+      !canDiscountWithoutApproval(user)
+    ) {
+      setApprovalOpen(true);
+      return;
+    }
     setPaymentOpen(true);
+  }
+
+  function approveDiscount(approval: DiscountApprovalPayload) {
+    setDiscountApproval(approval);
+    setApprovalOpen(false);
+    setPaymentOpen(true);
+  }
+
+  function cancelDiscountApproval() {
+    setApprovalOpen(false);
+    setNotice("Discount not approved. Remove the discount or ask a supervisor.");
   }
 
   function openPaymentWithMethod(method: PaymentMethod) {
@@ -451,21 +511,30 @@ export function usePosCheckout({
       throw new Error("A branch and open till session are required before payment.");
     }
     const customer = pendingSale ? null : await resolveCustomer();
-    const sale =
-      pendingSale ??
-      (await createPosSale(token, {
-        branch_id: user.branch_id,
-        customer_id: customer?.id ?? null,
-        till_session_id: tillSession.id,
-        channel: "pos",
-        notes: "Created from POS terminal",
-        items: cart.map((item) => ({
-          variant_id: item.variantId,
-          serialized_unit_id: item.serializedUnitId,
-          quantity: item.quantity,
-          discount_amount: 0,
-        })),
-      }));
+    let sale = pendingSale;
+    if (!sale) {
+      try {
+        sale = await createPosSale(token, {
+          branch_id: user.branch_id,
+          customer_id: customer?.id ?? null,
+          till_session_id: tillSession.id,
+          channel: "pos",
+          notes: "Created from POS terminal",
+          discount_approval: discount > 0 ? discountApproval : null,
+          items: cart.map((item) => ({
+            variant_id: item.variantId,
+            serialized_unit_id: item.serializedUnitId,
+            quantity: item.quantity,
+            discount_amount: item.discountAmount,
+          })),
+        });
+      } catch (error) {
+        // A rejected approval must be re-entered, so never keep the password around.
+        setDiscountApproval(null);
+        throw error;
+      }
+      setDiscountApproval(null);
+    }
     setPendingSale(sale);
     void refreshPaymentAttempts(sale.id);
     return sale;
@@ -476,6 +545,7 @@ export function usePosCheckout({
     setReceipt(officialReceipt);
     setReceiptViewer(officialReceipt);
     setCart([]);
+    setDiscountApproval(null);
     setPendingSale(null);
     setPaymentReference("");
     setMpesaPhone("");
@@ -911,6 +981,10 @@ export function usePosCheckout({
     addToCart,
     updateQuantity,
     updateSerializedUnit,
+    setLineDiscount,
+    approvalOpen,
+    approveDiscount,
+    cancelDiscountApproval,
     openPayment,
     openPaymentWithMethod,
     manuallyCompleteMpesaPayment,

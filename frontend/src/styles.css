@@ -104,7 +104,6 @@ button:disabled {
 .success-button,
 .order-actions button,
 .quick-payment-actions button,
-.order-keypad-actions button,
 .customer-strip button {
   border: 0;
   border-radius: var(--radius);
@@ -3396,28 +3395,10 @@ button:disabled {
   font-size: 22px;
 }
 
-.order-keypad-actions {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  border-top: 1px solid var(--line);
-}
-
-.order-keypad-actions button,
 .quick-payment-actions button,
 .order-actions button {
   min-height: 46px;
   border-radius: 0;
-}
-
-.order-keypad-actions button {
-  border: 0;
-  border-right: 1px solid var(--line);
-  background: #fff;
-  color: var(--muted);
-}
-
-.order-keypad-actions button:last-child {
-  border-right: 0;
 }
 
 .quick-payment-actions {
@@ -4963,7 +4944,6 @@ button:disabled {
     font-size: 18px;
   }
 
-  .order-keypad-actions button,
   .quick-payment-actions button,
   .order-actions button {
     min-height: 38px;
@@ -5378,4 +5358,93 @@ button:disabled {
   .erp-workspace--pos {
     height: calc(100dvh - 111px);
   }
+}
+
+/* Line discounts and supervisor approval */
+
+.order-line__was {
+  margin-right: 6px;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.order-line__controls button.is-active {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.line-discount-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-soft);
+}
+
+.line-discount-editor select,
+.line-discount-editor input {
+  height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.line-discount-editor input {
+  width: 96px;
+}
+
+.line-discount-editor button {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.line-discount-editor__error {
+  flex-basis: 100%;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.supervisor-modal {
+  display: grid;
+  gap: 14px;
+  width: min(420px, calc(100vw - 32px));
+  padding: 22px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.supervisor-modal header {
+  display: grid;
+  gap: 4px;
+}
+
+.supervisor-modal h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.supervisor-modal header span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.supervisor-modal label {
+  display: grid;
+  gap: 4px;
+  font-weight: 700;
+}
+
+.supervisor-modal input {
+  height: 38px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
 }

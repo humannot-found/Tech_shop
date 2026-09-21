@@ -8,7 +8,11 @@ export type CartItem = PosProduct & {
   lineId: string;
   quantity: number;
   serializedUnitId: string | null;
+  /** Discount for the whole line, in KES. */
+  discountAmount: number;
 };
+
+export type DiscountMode = "percent" | "amount" | "price";
 
 export type PaymentMethod = "cash" | "mpesa" | "card" | "split";
 export type SplitMethod = "cash" | "mpesa" | "card";

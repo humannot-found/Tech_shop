@@ -1,11 +1,12 @@
 import type {
   CatalogProduct,
+  CurrentUser,
   PosProduct,
   SerializedUnit,
   StatusTone,
   TillSession,
 } from "../../api/types";
-import type { SplitBalanceState } from "./types";
+import type { DiscountMode, SplitBalanceState } from "./types";
 
 export function money(value: number) {
   return new Intl.NumberFormat("en-KE", {
@@ -89,4 +90,41 @@ export function productsFromApi(products: CatalogProduct[]): PosProduct[] {
       accent: accents[index % accents.length],
     })),
   );
+}
+
+export function canDiscountWithoutApproval(user: CurrentUser | null) {
+  if (!user) return false;
+  return (
+    ["admin", "owner"].includes(user.role_code.toLowerCase()) ||
+    user.permissions.includes("*") ||
+    user.permissions.includes("sales.discount")
+  );
+}
+
+/** Turns what the cashier typed into a line discount in KES, or an error. */
+export function lineDiscountFromInput(
+  mode: DiscountMode,
+  rawValue: string,
+  lineGross: number,
+): { amount: number } | { error: string } {
+  const value = Number(rawValue);
+  if (rawValue.trim() === "" || !Number.isFinite(value) || value < 0) {
+    return { error: "Enter a number of zero or more." };
+  }
+  let amount: number;
+  if (mode === "percent") {
+    if (value > 100) return { error: "A percentage cannot be more than 100." };
+    amount = Math.round((lineGross * value) / 100);
+  } else if (mode === "amount") {
+    amount = value;
+  } else {
+    if (value > lineGross) {
+      return { error: "The new price cannot be higher than the list price." };
+    }
+    amount = lineGross - value;
+  }
+  if (amount > lineGross) {
+    return { error: "The discount cannot be more than the line total." };
+  }
+  return { amount: Math.round(amount * 100) / 100 };
 }
