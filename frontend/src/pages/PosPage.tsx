@@ -1,169 +1,67 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   ApiError,
-  addRepairPayment,
   addSalePayment,
   cancelPosSale,
-  closeTillSession,
-  collectRepair,
   createCustomer,
   createPosSale,
   currentTillSession,
-  getRepairInvoice,
   getPosSale,
   getSaleReceipt,
   listCatalogProducts,
   listCustomers,
-  listRepairPickups,
   listSalePayments,
   listPosSales,
   listSerializedUnits,
   listTills,
   manuallyConfirmMpesaPayment,
-  manuallyConfirmRepairMpesaPayment,
   markPaymentAttemptOutcome,
-  openTillSession,
   queryMpesaPaymentStatus,
   recordFailedPaymentAttempt,
   sendMpesaStkPush,
-  sendRepairMpesaStkPush,
 } from "../api/client";
 import type {
-  CatalogProduct,
   Customer,
   Payment,
   PosProduct,
   PosSale,
-  RepairCollection,
-  RepairInvoice,
   Receipt,
   SerializedUnit,
   StatusTone,
-  Till,
-  TillSession,
 } from "../api/types";
 import { StatusPill } from "../components/StatusPill";
 import { ToastNotice } from "../components/ToastNotice";
 import { mockProducts } from "../data/mockProducts";
 import { useAuth } from "../state/auth";
-import { dateLabel } from "../utils/format";
-
-type CartItem = PosProduct & {
-  lineId: string;
-  quantity: number;
-  serializedUnitId: string | null;
-};
-
-type PaymentMethod = "cash" | "mpesa" | "card" | "split";
-type SplitMethod = "cash" | "mpesa" | "card";
-type RepairPaymentMethod = "cash" | "mpesa" | "card";
-type PosWorkspaceTab = "products" | "receipts" | "repair_pickups" | "held";
-type SalesHistoryStatus = "all" | "completed" | "pending_payment" | "cancelled";
-type SplitBalanceState = "ready" | "remaining" | "over";
-
-type PosPageProps = {
-  focusRepairTicketId?: string | null;
-  onRepairFocusHandled?: () => void;
-};
-
-type CollectedRepairSnapshot = RepairCollection & {
-  invoice: RepairInvoice;
-};
-
-type HeldOrder = {
-  id: string;
-  label: string;
-  cart: CartItem[];
-  customerName: string;
-  customerPhone: string;
-  createdAt: string;
-  total: number;
-};
-
-function money(value: number) {
-  return new Intl.NumberFormat("en-KE", {
-    style: "currency",
-    currency: "KES",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function idempotencyKey() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `pos-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function wait(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-const mpesaPollSchedule = [
-  1000, 1500, 1500, 2000, 2500, 3000, 4000, 5000, 7000, 10000, 10000,
-];
-
-function unitLabel(unit?: SerializedUnit) {
-  if (!unit) return "No unit selected";
-  return unit.imei || unit.serial_number || unit.id;
-}
-
-function saleStatusTone(status: string): StatusTone {
-  if (status === "completed" || status === "paid") return "success";
-  if (status === "pending_payment" || status === "draft") return "warning";
-  if (status === "voided" || status === "refunded" || status === "cancelled") {
-    return "danger";
-  }
-  return "neutral";
-}
-
-function paymentStatusTone(status: string): StatusTone {
-  if (status === "completed") return "success";
-  if (status === "pending") return "warning";
-  if (status === "failed" || status === "cancelled") return "danger";
-  if (status === "refunded") return "neutral";
-  return "neutral";
-}
-
-function tillVariance(session: TillSession | null) {
-  if (!session?.expected_cash || !session.closing_cash) return null;
-  return Number(session.closing_cash) - Number(session.expected_cash);
-}
-
-function splitBalanceState(balance: number): SplitBalanceState {
-  if (Math.round(balance * 100) === 0) return "ready";
-  return balance < 0 ? "over" : "remaining";
-}
-
-function splitBalanceLabel(balance: number) {
-  const state = splitBalanceState(balance);
-  if (state === "ready") return "Balanced";
-  if (state === "over") return `Over by ${money(Math.abs(balance))}`;
-  return `${money(balance)} remaining`;
-}
-
-function productsFromApi(products: CatalogProduct[]): PosProduct[] {
-  const accents = ["#4e5381", "#0388d2", "#00897b", "#faaa33", "#aa47bd"];
-
-  return products.flatMap((product, index) =>
-    product.variants.map((variant) => ({
-      id: `${product.id}:${variant.id}`,
-      variantId: variant.id,
-      name: product.name.replace(/^(Demo|Sample)\s+/i, ""),
-      variantName: variant.name,
-      sku: variant.sku,
-      category: product.warranty_months ? "Devices" : "Accessories",
-      price: Number(variant.selling_price),
-      trackingType: variant.tracking_type,
-      stockHint:
-        variant.tracking_type === "bulk"
-          ? "Bulk stock"
-          : variant.tracking_type.toUpperCase(),
-      accent: accents[index % accents.length],
-    })),
-  );
-}
+import { HeldOrdersTab } from "./pos/HeldOrdersTab";
+import { OrderPanel } from "./pos/OrderPanel";
+import { PaymentModal } from "./pos/PaymentModal";
+import { ProductsTab } from "./pos/ProductsTab";
+import { ReceiptModal } from "./pos/ReceiptModal";
+import { ReceiptsTab } from "./pos/ReceiptsTab";
+import { RepairInvoiceModal } from "./pos/RepairInvoiceModal";
+import { RepairPickupsTab } from "./pos/RepairPickupsTab";
+import { TillPanels } from "./pos/TillPanels";
+import type {
+  CartItem,
+  HeldOrder,
+  PaymentMethod,
+  PosPageProps,
+  PosWorkspaceTab,
+  SalesHistoryStatus,
+  SplitMethod,
+} from "./pos/types";
+import { useRepairDesk } from "./pos/useRepairDesk";
+import { useTill } from "./pos/useTill";
+import {
+  idempotencyKey,
+  money,
+  mpesaPollSchedule,
+  productsFromApi,
+  splitBalanceState,
+  wait,
+} from "./pos/utils";
 
 export function PosPage({
   focusRepairTicketId = null,
@@ -197,42 +95,40 @@ export function PosPage({
   const [notice, setNotice] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [receiptViewer, setReceiptViewer] = useState<Receipt | null>(null);
-  const [repairPickups, setRepairPickups] = useState<RepairInvoice[]>([]);
-  const [selectedRepairInvoice, setSelectedRepairInvoice] =
-    useState<RepairInvoice | null>(null);
-  const [lastCollectedRepair, setLastCollectedRepair] =
-    useState<CollectedRepairSnapshot | null>(null);
-  const [repairReceiptViewer, setRepairReceiptViewer] =
-    useState<RepairInvoice | null>(null);
-  const [repairPickupBusy, setRepairPickupBusy] = useState(false);
-  const [repairPaymentMethod, setRepairPaymentMethod] =
-    useState<RepairPaymentMethod>("cash");
-  const [repairPaymentAmount, setRepairPaymentAmount] = useState("");
-  const [repairPaymentReference, setRepairPaymentReference] = useState("");
-  const [repairPaymentNotes, setRepairPaymentNotes] = useState("");
-  const [repairMpesaPhone, setRepairMpesaPhone] = useState("");
-  const [repairMpesaReceiptCode, setRepairMpesaReceiptCode] = useState("");
-  const [repairPaymentStatus, setRepairPaymentStatus] = useState<string | null>(null);
-  const [repairPendingPayment, setRepairPendingPayment] = useState<Payment | null>(
-    null,
-  );
+
   const [recentSales, setRecentSales] = useState<PosSale[]>([]);
   const [historyStatus, setHistoryStatus] = useState<SalesHistoryStatus>("all");
   const [historySearch, setHistorySearch] = useState("");
   const [historyBusy, setHistoryBusy] = useState(false);
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
   const [pendingSale, setPendingSale] = useState<PosSale | null>(null);
-  const [tillSession, setTillSession] = useState<TillSession | null>(null);
-  const [tills, setTills] = useState<Till[]>([]);
-  const [selectedTillId, setSelectedTillId] = useState("");
-  const [openingFloat, setOpeningFloat] = useState("1000");
-  const [closingCash, setClosingCash] = useState("");
-  const [closeTillOpen, setCloseTillOpen] = useState(false);
-  const [lastClosedTill, setLastClosedTill] = useState<TillSession | null>(null);
-  const [tillBusy, setTillBusy] = useState(false);
+
   const [serializedUnitsByVariant, setSerializedUnitsByVariant] = useState<
     Record<string, SerializedUnit[]>
   >({});
+
+  const till = useTill({
+    token,
+    isPreview,
+    user,
+    setNotice,
+    cartLineCount: cart.length,
+    heldOrderCount: heldOrders.length,
+    onClosed: () => void refreshRecentSales(),
+  });
+  const { tillSession, setTillSession, setTills, setSelectedTillId } = till;
+  const repairDesk = useRepairDesk({
+    token,
+    isPreview,
+    user,
+    tillSession,
+    setNotice,
+    setActiveWorkspaceTab,
+    focusRepairTicketId,
+    onRepairFocusHandled,
+  });
+  const { repairReceiptViewer, setRepairReceiptViewer } = repairDesk;
+
 
   useEffect(() => {
     if (!token || isPreview) {
@@ -301,80 +197,6 @@ export function PosPage({
   useEffect(() => {
     void refreshRecentSales();
   }, [historyStatus, isPreview, token, user?.branch_id]);
-
-  useEffect(() => {
-    void refreshRepairPickups();
-  }, [isPreview, token, user?.branch_id]);
-
-  useEffect(() => {
-    if (!focusRepairTicketId) return;
-
-    setActiveWorkspaceTab("repair_pickups");
-
-    if (!token || isPreview) {
-      onRepairFocusHandled?.();
-      return;
-    }
-
-    let active = true;
-    setRepairPickupBusy(true);
-    getRepairInvoice(token, focusRepairTicketId)
-      .then((invoice) => {
-        if (!active) return;
-
-        setSelectedRepairInvoice(invoice);
-        setLastCollectedRepair(null);
-        setRepairPickups((current) => {
-          if (current.some((item) => item.ticket_id === invoice.ticket_id)) {
-            return current.map((item) =>
-              item.ticket_id === invoice.ticket_id ? invoice : item,
-            );
-          }
-
-          return [invoice, ...current];
-        });
-        setNotice(`${invoice.ticket_number} opened in POS repair payment desk.`);
-      })
-      .catch((error) => {
-        if (!active) return;
-        setNotice(
-          error instanceof Error
-            ? error.message
-            : "Could not open repair payment in POS.",
-        );
-      })
-      .finally(() => {
-        if (!active) return;
-        setRepairPickupBusy(false);
-        onRepairFocusHandled?.();
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [focusRepairTicketId, isPreview, onRepairFocusHandled, token]);
-
-  useEffect(() => {
-    if (!selectedRepairInvoice) {
-      setRepairPaymentAmount("");
-      setRepairMpesaPhone("");
-      setRepairMpesaReceiptCode("");
-      setRepairPendingPayment(null);
-      setRepairPaymentStatus(null);
-      return;
-    }
-    setRepairPaymentAmount(
-      Number(selectedRepairInvoice.balance_due) > 0
-        ? String(Number(selectedRepairInvoice.balance_due))
-        : "",
-    );
-    setRepairPaymentReference("");
-    setRepairPaymentNotes("");
-    setRepairMpesaPhone(selectedRepairInvoice.customer_phone ?? "");
-    setRepairMpesaReceiptCode("");
-    setRepairPendingPayment(null);
-    setRepairPaymentStatus(null);
-  }, [selectedRepairInvoice?.ticket_id, selectedRepairInvoice?.balance_due]);
 
   const categories = useMemo(
     () => ["All", ...Array.from(new Set(products.map((product) => product.category)))],
@@ -451,21 +273,6 @@ export function PosPage({
     missingSerializedUnits === 0 &&
     (!token || isPreview || Boolean(tillSession)) &&
     (!token || isPreview || catalogLive);
-  const selectedRepairBalance = Number(selectedRepairInvoice?.balance_due ?? 0);
-  const selectedRepairPaid = Number(selectedRepairInvoice?.paid_amount ?? 0);
-  const repairPaymentValue = Number(repairPaymentAmount) || 0;
-  const selectedRepairIsPaid = Math.round(selectedRepairBalance * 100) === 0;
-  const collectRepairIssue = !selectedRepairInvoice
-    ? null
-    : !token || isPreview
-      ? "Live cashier login required before completing device collection."
-      : !tillSession
-        ? "Open your till before handing over repaired devices."
-        : !selectedRepairIsPaid
-          ? `Collect the remaining ${money(selectedRepairBalance)} before handover.`
-          : null;
-  const canCollectSelectedRepair =
-    Boolean(selectedRepairInvoice) && !collectRepairIssue;
 
   async function refreshRecentSales() {
     if (!token || isPreview || !user?.branch_id) return;
@@ -483,280 +290,6 @@ export function PosPage({
     }
   }
 
-  function selectRepairPickup(invoice: RepairInvoice) {
-    setSelectedRepairInvoice(invoice);
-    setLastCollectedRepair(null);
-    setActiveWorkspaceTab("repair_pickups");
-  }
-
-  async function refreshRepairPickups() {
-    if (!token || isPreview || !user?.branch_id) return;
-    setRepairPickupBusy(true);
-    try {
-      const invoices = await listRepairPickups(token, user.branch_id);
-      setRepairPickups(invoices);
-      setSelectedRepairInvoice((current) => {
-        if (!invoices.length) return null;
-        if (!current) return invoices[0];
-        return (
-          invoices.find((invoice) => invoice.ticket_id === current.ticket_id) ??
-          invoices[0]
-        );
-      });
-    } catch (error) {
-      setNotice(
-        error instanceof Error
-          ? error.message
-          : "Could not load repair pickups for this branch.",
-      );
-    } finally {
-      setRepairPickupBusy(false);
-    }
-  }
-
-  async function refreshSelectedRepairInvoice(
-    ticketId: string,
-    message?: string,
-    openReceipt = false,
-  ) {
-    if (!token) throw new Error("Sign in before loading repair invoice.");
-    const updatedInvoice = await getRepairInvoice(token, ticketId);
-    setSelectedRepairInvoice(updatedInvoice);
-    setRepairPickups((current) => {
-      if (current.some((invoice) => invoice.ticket_id === updatedInvoice.ticket_id)) {
-        return current.map((invoice) =>
-          invoice.ticket_id === updatedInvoice.ticket_id ? updatedInvoice : invoice,
-        );
-      }
-      return [updatedInvoice, ...current];
-    });
-    if (openReceipt) {
-      setRepairReceiptViewer(updatedInvoice);
-    }
-    if (message) {
-      setNotice(message);
-    }
-    return updatedInvoice;
-  }
-
-  async function waitForRepairMpesaCompletion(paymentId: string, ticketId: string) {
-    if (!token) return false;
-
-    for (let attempt = 0; attempt < mpesaPollSchedule.length; attempt += 1) {
-      const delay = mpesaPollSchedule[attempt];
-      setRepairPaymentStatus(
-        `M-Pesa prompt sent. Checking repair payment ${attempt + 1}/${mpesaPollSchedule.length}...`,
-      );
-      await wait(delay);
-      const result = await queryMpesaPaymentStatus(token, paymentId);
-      setRepairPendingPayment(result.payment);
-      setRepairPaymentStatus(result.customer_message);
-
-      if (result.payment.status === "completed") {
-        await refreshSelectedRepairInvoice(
-          ticketId,
-          "Repair M-Pesa payment received and receipt generated.",
-          true,
-        );
-        setRepairPendingPayment(null);
-        setRepairMpesaReceiptCode("");
-        return true;
-      }
-
-      if (["failed", "cancelled"].includes(result.payment.status)) {
-        return false;
-      }
-    }
-
-    return false;
-  }
-
-  async function manuallyCompleteRepairMpesaPayment() {
-    if (!selectedRepairInvoice || !token || isPreview) {
-      setNotice("Select a live repair invoice first.");
-      return;
-    }
-    if (!repairMpesaReceiptCode.trim()) {
-      setNotice("Enter the M-Pesa receipt code from the customer's SMS.");
-      return;
-    }
-
-    setRepairPickupBusy(true);
-    setRepairPaymentStatus("Confirming repair M-Pesa receipt code...");
-    try {
-      await manuallyConfirmRepairMpesaPayment(
-        token,
-        selectedRepairInvoice.ticket_id,
-        {
-          provider_reference: repairMpesaReceiptCode.trim(),
-          notes: "Cashier confirmed delayed repair M-Pesa callback from customer SMS.",
-        },
-      );
-      await refreshSelectedRepairInvoice(
-        selectedRepairInvoice.ticket_id,
-        "Repair M-Pesa payment manually confirmed and receipt generated.",
-        true,
-      );
-      setRepairPendingPayment(null);
-      setRepairMpesaReceiptCode("");
-      setRepairPaymentStatus(null);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Could not confirm repair M-Pesa payment.";
-      setNotice(message);
-      setRepairPaymentStatus(message);
-    } finally {
-      setRepairPickupBusy(false);
-    }
-  }
-
-  async function recordRepairPickupPayment(event: FormEvent) {
-    event.preventDefault();
-    if (!selectedRepairInvoice) {
-      setNotice("Select a ready repair invoice first.");
-      return;
-    }
-    if (!token || isPreview) {
-      setNotice("Preview mode cannot record live repair payments.");
-      return;
-    }
-    if (!tillSession) {
-      setNotice("Open your till before receiving repair payments.");
-      return;
-    }
-    if (repairPaymentValue <= 0) {
-      setNotice("Enter a repair payment amount greater than zero.");
-      return;
-    }
-    if (repairPaymentValue > selectedRepairBalance) {
-      setNotice("Repair payment cannot exceed the remaining balance.");
-      return;
-    }
-    if (repairPaymentMethod === "card" && !repairPaymentReference.trim()) {
-      setNotice("Enter the card payment reference.");
-      return;
-    }
-    if (
-      repairPaymentMethod === "mpesa" &&
-      !repairPaymentReference.trim() &&
-      !repairMpesaPhone.trim()
-    ) {
-      setNotice("Enter the customer's M-Pesa phone or receipt code.");
-      return;
-    }
-
-    setRepairPickupBusy(true);
-    setRepairPaymentStatus(null);
-    try {
-      if (repairPaymentMethod === "mpesa" && !repairPaymentReference.trim()) {
-        setRepairPaymentStatus("Sending repair M-Pesa prompt to customer...");
-        const prompt = await sendRepairMpesaStkPush(
-          token,
-          selectedRepairInvoice.ticket_id,
-          {
-            till_session_id: tillSession.id,
-            phone_number: repairMpesaPhone.trim(),
-            amount: repairPaymentValue,
-            idempotency_key: idempotencyKey(),
-            notes:
-              repairPaymentNotes.trim() ||
-              `Repair pickup M-Pesa payment for ${selectedRepairInvoice.ticket_number}`,
-          },
-        );
-        setRepairPendingPayment(prompt.payment);
-        setRepairPaymentStatus(prompt.customer_message);
-        setNotice(prompt.customer_message);
-        const completed = await waitForRepairMpesaCompletion(
-          prompt.payment.id,
-          selectedRepairInvoice.ticket_id,
-        );
-        if (!completed) {
-          setRepairPaymentStatus(
-            "M-Pesa prompt sent. Waiting for callback or manual confirmation.",
-          );
-          setNotice(
-            "Repair M-Pesa prompt sent. If the customer has paid but the receipt is not generated, enter their M-Pesa receipt code below.",
-          );
-        }
-        return;
-      }
-
-      await addRepairPayment(token, selectedRepairInvoice.ticket_id, {
-        till_session_id: tillSession.id,
-        method: repairPaymentMethod,
-        amount: repairPaymentValue,
-        provider_reference:
-          repairPaymentMethod === "cash" ? null : repairPaymentReference.trim(),
-        payer_phone:
-          repairPaymentMethod === "mpesa"
-            ? repairMpesaPhone.trim() || selectedRepairInvoice.customer_phone
-            : selectedRepairInvoice.customer_phone,
-        payer_name: selectedRepairInvoice.customer_name,
-        payer_account_reference: selectedRepairInvoice.ticket_number,
-        idempotency_key: idempotencyKey(),
-        notes: repairPaymentNotes.trim() || "Repair pickup payment received at POS",
-      });
-      const updatedInvoice = await refreshSelectedRepairInvoice(
-        selectedRepairInvoice.ticket_id,
-        undefined,
-        true,
-      );
-      setRepairPendingPayment(null);
-      setRepairMpesaReceiptCode("");
-      setRepairPaymentStatus(null);
-      setNotice(
-        Number(updatedInvoice.balance_due) === 0
-          ? `${updatedInvoice.ticket_number} fully paid. Hand over the device to complete collection.`
-          : `Payment recorded for ${updatedInvoice.ticket_number}.`,
-      );
-    } catch (error) {
-      setNotice(
-        error instanceof Error ? error.message : "Could not record repair payment.",
-      );
-    } finally {
-      setRepairPickupBusy(false);
-    }
-  }
-
-  async function completeRepairPickup() {
-    if (!selectedRepairInvoice) {
-      setNotice("Select a ready repair invoice first.");
-      return;
-    }
-    if (!token || isPreview) {
-      setNotice("Preview mode cannot complete live repair collections.");
-      return;
-    }
-    if (!tillSession) {
-      setNotice("Open your till before handing over repaired devices.");
-      return;
-    }
-    if (selectedRepairBalance > 0) {
-      setNotice("Repair invoice must be fully paid before collection.");
-      return;
-    }
-
-    setRepairPickupBusy(true);
-    try {
-      const collectedInvoice = selectedRepairInvoice;
-      const collection = await collectRepair(token, selectedRepairInvoice.ticket_id);
-      setRepairPickups((current) =>
-        current.filter((invoice) => invoice.ticket_id !== collection.ticket_id),
-      );
-      setSelectedRepairInvoice(null);
-      setLastCollectedRepair({
-        ...collection,
-        invoice: collectedInvoice,
-      });
-      setNotice(`${collection.ticket_number} collected. Device handover is complete.`);
-    } catch (error) {
-      setNotice(
-        error instanceof Error ? error.message : "Could not complete repair collection.",
-      );
-    } finally {
-      setRepairPickupBusy(false);
-    }
-  }
 
   async function refreshPaymentAttempts(saleId: string) {
     if (!token || isPreview) return;
@@ -1518,263 +1051,39 @@ export function PosPage({
     }
   }
 
-  async function handleOpenTill(event: FormEvent) {
-    event.preventDefault();
-    if (!token || isPreview) {
-      setNotice("Preview mode does not need a live till session.");
-      return;
-    }
-    if (!user?.branch_id) {
-      setNotice("This user is not scoped to a branch. Use a branch cashier or manager to open POS.");
-      return;
-    }
-    if (!selectedTillId) {
-      setNotice("Select a till before opening a session.");
-      return;
-    }
-
-    setTillBusy(true);
-    try {
-      const session = await openTillSession(token, {
-        till_id: selectedTillId,
-        opening_float: Number(openingFloat) || 0,
-      });
-      setTillSession(session);
-      setNotice(`Till opened with ${money(Number(session.opening_float))} float.`);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not open till session.");
-    } finally {
-      setTillBusy(false);
-    }
-  }
-
-  async function handleCloseTill(event: FormEvent) {
-    event.preventDefault();
-    if (!token || isPreview || !tillSession) {
-      setNotice("No live till session is open.");
-      return;
-    }
-    if (cart.length) {
-      setNotice("Clear or complete the current cart before closing the till.");
-      return;
-    }
-    if (heldOrders.length) {
-      setNotice("Resume or discard held orders before closing the till.");
-      return;
-    }
-    if (closingCash.trim() === "") {
-      setNotice("Enter the counted closing cash before closing the till.");
-      return;
-    }
-
-    setTillBusy(true);
-    try {
-      const closed = await closeTillSession(token, tillSession.id, {
-        closing_cash: Number(closingCash) || 0,
-      });
-      const variance = tillVariance(closed);
-      setLastClosedTill(closed);
-      setTillSession(null);
-      setCloseTillOpen(false);
-      setClosingCash("");
-      setNotice(
-        `Till closed. Expected ${money(Number(closed.expected_cash ?? 0))}, counted ${money(
-          Number(closed.closing_cash ?? 0),
-        )}, variance ${money(variance ?? 0)}.`,
-      );
-      void refreshRecentSales();
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not close till session.");
-    } finally {
-      setTillBusy(false);
-    }
-  }
-
   return (
     <section className="pos-terminal">
-      <aside className="pos-order-panel">
-        <header className="order-tabs">
-          <button className="orders-tab is-active">
-            <strong>Order 1</strong>
-            <span>{cart.length || 0} items</span>
-          </button>
-          <button
-            className="orders-tab"
-            onClick={() => setActiveWorkspaceTab("held")}
-          >
-            <strong>Held</strong>
-            <span>{heldOrders.length} orders</span>
-          </button>
-          <button
-            className="orders-tab orders-tab--add"
-            type="button"
-            onClick={startNewOrder}
-            title="Start a new blank order"
-          >
-            +
-          </button>
-        </header>
-
-        <div className="customer-strip customer-strip--editable">
-          <label>
-            <span>Customer name</span>
-            <input
-              value={customerName}
-              onChange={(event) => {
-                setCustomerName(event.target.value);
-                setPendingSale(null);
-              }}
-              placeholder="Walk-in customer"
-            />
-          </label>
-          <label>
-            <span>Phone for receipt</span>
-            <input
-              value={customerPhone}
-              onChange={(event) => {
-                setCustomerPhone(event.target.value);
-                setPendingSale(null);
-              }}
-              placeholder="0712 345 678"
-            />
-          </label>
-        </div>
-
-        <div className="order-status-strip">
-          <span>
-            <strong>{cart.length}</strong> line(s)
-          </span>
-          <span>
-            <strong>{cartUnitCount}</strong> unit(s)
-          </span>
-          <span>
-            <strong>{money(total)}</strong> total
-          </span>
-          <span className={checkoutIsReady ? "is-ready" : "is-warning"}>
-            {checkoutIsReady
-              ? "Ready"
-              : missingSerializedUnits
-                ? `${missingSerializedUnits} serial needed`
-                : tillSession || isPreview
-                  ? "Add items"
-                  : "Open till"}
-          </span>
-        </div>
-
-        <div className="order-list">
-          {cart.length === 0 && (
-            <div className="empty-order">
-              <strong>No items selected</strong>
-              <span>Search, scan, or choose a category to start selling.</span>
-            </div>
-          )}
-
-          {cart.map((item) => (
-            <article className="order-line" key={item.lineId}>
-              <div className="order-line__qty">
-                <strong>{item.quantity}</strong>
-                <span>
-                  {item.trackingType === "bulk" ? "Unit(s)" : item.trackingType.toUpperCase()}
-                </span>
-              </div>
-              <div className="order-line__meta">
-                <div>
-                  <h3>{item.name}</h3>
-                  <strong>{money(item.price * item.quantity)}</strong>
-                </div>
-                <small>
-                  {item.sku} / {item.variantName}
-                </small>
-
-                {item.trackingType !== "bulk" && (
-                  <label className="serial-select">
-                    IMEI / serial
-                    <select
-                      value={item.serializedUnitId ?? ""}
-                      onChange={(event) =>
-                        updateSerializedUnit(item.lineId, event.target.value)
-                      }
-                    >
-                      <option value="">Select unit</option>
-                      {(serializedUnitsByVariant[item.variantId] ?? []).map((unit) => (
-                        <option key={unit.id} value={unit.id}>
-                          {unitLabel(unit)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-
-                <div className="order-line__controls">
-                  <button onClick={() => updateQuantity(item.lineId, -1)}>
-                    -
-                  </button>
-                  <button onClick={() => updateQuantity(item.lineId, 1)}>
-                    +
-                  </button>
-                  <button onClick={() => updateQuantity(item.lineId, -item.quantity)}>
-                    Remove
-                  </button>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-
-        <footer className="order-footer">
-          <div className="order-summary">
-            <div>
-              <span>Subtotal</span>
-              <strong>{money(subtotal)}</strong>
-            </div>
-            <div>
-              <span>Discount</span>
-              <strong>{money(discount)}</strong>
-            </div>
-            <div className="order-summary__total">
-              <span>Total</span>
-              <strong>{money(total)}</strong>
-            </div>
-          </div>
-
-          <div className="order-keypad-actions">
-            {(["Qty", "Price", "Disc %", "Disc KES"] as const).map((control) => (
-              <button
-                key={control}
-                type="button"
-                onClick={() => explainOrderControl(control)}
-              >
-                {control}
-              </button>
-            ))}
-          </div>
-
-          <div className="quick-payment-actions" aria-label="Quick payment methods">
-            <button type="button" onClick={() => openPaymentWithMethod("cash")}>
-              Cash
-            </button>
-            <button type="button" onClick={() => openPaymentWithMethod("mpesa")}>
-              M-Pesa
-            </button>
-            <button type="button" onClick={() => openPaymentWithMethod("card")}>
-              Card
-            </button>
-            <button type="button" onClick={() => openPaymentWithMethod("split")}>
-              Split
-            </button>
-          </div>
-
-          <div className="order-actions">
-            <button className="danger-button" onClick={clearCurrentCart}>
-              Clear Cart
-            </button>
-            <button onClick={holdCurrentOrder}>Hold</button>
-            <button className="success-button" onClick={openPayment}>
-              Payment
-            </button>
-          </div>
-        </footer>
-      </aside>
+      <OrderPanel
+        cart={cart}
+        heldOrderCount={heldOrders.length}
+        onShowHeldOrders={() => setActiveWorkspaceTab("held")}
+        onNewOrder={startNewOrder}
+        customerName={customerName}
+        customerPhone={customerPhone}
+        onCustomerNameChange={(value) => {
+          setCustomerName(value);
+          setPendingSale(null);
+        }}
+        onCustomerPhoneChange={(value) => {
+          setCustomerPhone(value);
+          setPendingSale(null);
+        }}
+        checkoutIsReady={checkoutIsReady}
+        missingSerializedUnits={missingSerializedUnits}
+        hasTillOrPreview={Boolean(tillSession || isPreview)}
+        cartUnitCount={cartUnitCount}
+        subtotal={subtotal}
+        discount={discount}
+        total={total}
+        serializedUnitsByVariant={serializedUnitsByVariant}
+        updateSerializedUnit={updateSerializedUnit}
+        updateQuantity={updateQuantity}
+        explainOrderControl={explainOrderControl}
+        openPaymentWithMethod={openPaymentWithMethod}
+        openPayment={openPayment}
+        clearCurrentCart={clearCurrentCart}
+        holdCurrentOrder={holdCurrentOrder}
+      />
 
       <section className="pos-products-panel">
         <header className="pos-workspace-header">
@@ -1794,8 +1103,8 @@ export function PosPage({
                 {tab === "receipts" && recentSales.length > 0 && (
                   <span>{recentSales.length}</span>
                 )}
-                {tab === "repair_pickups" && repairPickups.length > 0 && (
-                  <span>{repairPickups.length}</span>
+                {tab === "repair_pickups" && repairDesk.repairPickups.length > 0 && (
+                  <span>{repairDesk.repairPickups.length}</span>
                 )}
                 {tab === "held" && heldOrders.length > 0 && (
                   <span>{heldOrders.length}</span>
@@ -1812,1291 +1121,109 @@ export function PosPage({
         <ToastNotice message={notice} onClose={() => setNotice(null)} />
 
         {activeWorkspaceTab === "products" && (
-          <section className="pos-products-view">
-            <header className="pos-products-header">
-              <div className="pos-search-row">
-                <label className="pos-search">
-                  <span>Search</span>
-                  <input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search products, SKU, barcode"
-                    autoFocus
-                  />
-                </label>
-                <button
-                  className="info-button pos-result-chip"
-                  type="button"
-                  onClick={showProductInformationHint}
-                >
-                  <strong>{filtered.length}</strong>
-                  <span>{catalogLive ? "Live catalog" : "Sample catalog"}</span>
-                </button>
-              </div>
-
-              <div className="category-list">
-                {categories.map((category) => (
-                  <button
-                    key={category}
-                    className={activeCategory === category ? "is-active" : ""}
-                    onClick={() => setActiveCategory(category)}
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
-            </header>
-
-            {!tillSession && token && !isPreview && (
-              <form className="till-open-panel" onSubmit={handleOpenTill}>
-                <div>
-                  <p className="eyebrow">Open till</p>
-                  <strong>Start cashier session</strong>
-                  <span>Select a physical till and confirm the opening cash float.</span>
-                </div>
-                <label>
-                  Till
-                  <select
-                    value={selectedTillId}
-                    onChange={(event) => setSelectedTillId(event.target.value)}
-                  >
-                    <option value="">Select till</option>
-                    {tills.map((till) => (
-                      <option key={till.id} value={till.id}>
-                        {till.name} / {till.code}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Opening float
-                  <input
-                    type="number"
-                    min="0"
-                    value={openingFloat}
-                    onChange={(event) => setOpeningFloat(event.target.value)}
-                  />
-                </label>
-                <button className="primary-button" disabled={tillBusy || !tills.length}>
-                  {tillBusy ? "Opening..." : "Open Till"}
-                </button>
-              </form>
-            )}
-
-            {tillSession && token && !isPreview && (
-              <section className="till-close-panel">
-                <div>
-                  <p className="eyebrow">Till session</p>
-                  <strong>Cashier till is open</strong>
-                  <span>
-                    Opened {dateLabel(tillSession.opened_at)} / Float{" "}
-                    {money(Number(tillSession.opening_float))}
-                  </span>
-                </div>
-                {!closeTillOpen ? (
-                  <button
-                    className="secondary-button"
-                    onClick={() => {
-                      setCloseTillOpen(true);
-                      setClosingCash(tillSession.expected_cash ?? "");
-                    }}
-                  >
-                    Close Till
-                  </button>
-                ) : (
-                  <form onSubmit={handleCloseTill}>
-                    <label>
-                      Counted closing cash
-                      <input
-                        type="number"
-                        min="0"
-                        value={closingCash}
-                        onChange={(event) => setClosingCash(event.target.value)}
-                        placeholder="Enter counted cash"
-                      />
-                    </label>
-                    <div className="table-actions">
-                      <button className="danger-button" disabled={tillBusy}>
-                        {tillBusy ? "Closing..." : "Confirm Close"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCloseTillOpen(false)}
-                        disabled={tillBusy}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </section>
-            )}
-
-            {!tillSession && lastClosedTill && (
-              <section className="till-close-summary">
-                <div>
-                  <p className="eyebrow">Last till close</p>
-                  <strong>{dateLabel(lastClosedTill.closed_at)}</strong>
-                  <span>
-                    Expected {money(Number(lastClosedTill.expected_cash ?? 0))} / Counted{" "}
-                    {money(Number(lastClosedTill.closing_cash ?? 0))}
-                  </span>
-                </div>
-                <StatusPill
-                  tone={(tillVariance(lastClosedTill) ?? 0) === 0 ? "success" : "warning"}
-                >
-                  Variance {money(tillVariance(lastClosedTill) ?? 0)}
-                </StatusPill>
-              </section>
-            )}
-
-            <div className="product-list-scroller">
-              <div className="terminal-product-grid">
-                {filtered.map((product) => (
-                  <button
-                    className="product-tile"
-                    key={product.id}
-                    onClick={() => addToCart(product)}
-                  >
-                    <span
-                      className="product-tile__media"
-                      style={{ background: product.accent }}
-                    >
-                      {product.name.slice(0, 2).toUpperCase()}
-                    </span>
-                    <span className="product-tile__body">
-                      <strong>{product.name}</strong>
-                      <small>{product.variantName}</small>
-                      <span className="product-tile__meta">
-                        <b>{money(product.price)}</b>
-                        <em>{product.stockHint}</em>
-                      </span>
-                    </span>
-                  </button>
-                ))}
-
-                {filtered.length === 0 && (
-                  <div className="pos-empty-state">
-                    <strong>No matching products</strong>
-                    <span>Try another search term or category.</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
+          <ProductsTab
+            query={query}
+            setQuery={setQuery}
+            filtered={filtered}
+            catalogLive={catalogLive}
+            categories={categories}
+            activeCategory={activeCategory}
+            setActiveCategory={setActiveCategory}
+            showProductInformationHint={showProductInformationHint}
+            addToCart={addToCart}
+          >
+            <TillPanels till={till} />
+          </ProductsTab>
         )}
 
         {activeWorkspaceTab === "receipts" && (
-          <section className="pos-receipts-workspace">
-            {receipt && (
-              <section className="receipt-strip">
-                <div>
-                  <p className="eyebrow">Last receipt</p>
-                  <strong>{receipt.invoice_number}</strong>
-                  <span>
-                    {receipt.branch_name} / {receipt.cashier_name ?? user?.full_name} /{" "}
-                    {receipt.items.length} item(s)
-                  </span>
-                  <span>{dateLabel(receipt.completed_at)}</span>
-                </div>
-                <div className="receipt-strip__actions">
-                  <strong>{money(Number(receipt.total_amount))}</strong>
-                  <button onClick={() => setReceiptViewer(receipt)}>Open</button>
-                </div>
-              </section>
-            )}
-
-            <section className="sales-history-panel">
-              <header>
-                <div>
-                  <p className="eyebrow">Recent sales</p>
-                  <strong>Receipts / invoices</strong>
-                </div>
-                <button onClick={() => void refreshRecentSales()} disabled={historyBusy}>
-                  {historyBusy ? "Loading..." : "Refresh"}
-                </button>
-              </header>
-
-              <div className="sales-history-filters">
-                <label>
-                  Status
-                  <select
-                    value={historyStatus}
-                    onChange={(event) =>
-                      setHistoryStatus(event.target.value as SalesHistoryStatus)
-                    }
-                  >
-                    <option value="all">All recent</option>
-                    <option value="completed">Completed</option>
-                    <option value="pending_payment">Pending payment</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </label>
-                <label>
-                  Search
-                  <input
-                    value={historySearch}
-                    onChange={(event) => setHistorySearch(event.target.value)}
-                    placeholder="Invoice, status, item, amount"
-                  />
-                </label>
-              </div>
-
-              <div className="sales-history-list">
-                {filteredRecentSales.length === 0 && (
-                  <div className="sales-history-empty">
-                    No sales match the current filters.
-                  </div>
-                )}
-
-                {filteredRecentSales.map((sale) => (
-                  <article className="sales-history-row" key={sale.id}>
-                    <div>
-                      <strong>{sale.invoice_number}</strong>
-                      <span>
-                        {sale.items.length} item(s) / Paid{" "}
-                        {money(Number(sale.paid_amount))}
-                      </span>
-                      <span>{dateLabel(sale.completed_at ?? sale.created_at)}</span>
-                    </div>
-                    <StatusPill tone={saleStatusTone(sale.status)}>
-                      {sale.status.replace(/_/g, " ")}
-                    </StatusPill>
-                    <strong>{money(Number(sale.total_amount))}</strong>
-                    <div className="sales-history-actions">
-                      {sale.status === "pending_payment" && (
-                        <button
-                          type="button"
-                          disabled={historyBusy}
-                          onClick={() => openManualMpesaRecovery(sale)}
-                        >
-                          Confirm M-Pesa
-                        </button>
-                      )}
-                      {sale.status === "pending_payment" &&
-                        Number(sale.paid_amount) === 0 && (
-                          <button
-                            type="button"
-                            disabled={historyBusy || paymentBusy}
-                            onClick={() => void cancelUnpaidSale(sale)}
-                          >
-                            Cancel Sale
-                          </button>
-                        )}
-                      <button
-                        disabled={sale.status !== "completed" || historyBusy}
-                        onClick={() => void openReceiptViewer(sale.id)}
-                      >
-                        Receipt
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-          </section>
+          <ReceiptsTab
+            receipt={receipt}
+            onOpenReceipt={setReceiptViewer}
+            filteredRecentSales={filteredRecentSales}
+            historyBusy={historyBusy}
+            historyStatus={historyStatus}
+            setHistoryStatus={setHistoryStatus}
+            historySearch={historySearch}
+            setHistorySearch={setHistorySearch}
+            paymentBusy={paymentBusy}
+            refreshRecentSales={refreshRecentSales}
+            openManualMpesaRecovery={openManualMpesaRecovery}
+            cancelUnpaidSale={cancelUnpaidSale}
+            openReceiptViewer={openReceiptViewer}
+          />
         )}
 
         {activeWorkspaceTab === "repair_pickups" && (
-          <section className="pos-repair-pickups-workspace">
-            <section className="repair-pickup-queue">
-              <header>
-                <div>
-                  <p className="eyebrow">Repair payment desk</p>
-                  <strong>Payments & pickups</strong>
-                  <span>
-                    Ready repairs appear here automatically. Repairs opened from
-                    the repair desk can also be paid from this POS workspace.
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void refreshRepairPickups()}
-                  disabled={repairPickupBusy}
-                >
-                  {repairPickupBusy ? "Refreshing..." : "Refresh"}
-                </button>
-              </header>
-
-              {!tillSession && token && !isPreview && (
-                <div className="repair-pickup-warning">
-                  Open your till before recording repair payments or handing over
-                  repaired devices.
-                </div>
-              )}
-
-              <div className="repair-pickup-list">
-                {repairPickups.length === 0 && (
-                  <div className="pos-empty-state">
-                    <strong>No repair pickups yet</strong>
-                    <span>
-                      Once a technician marks a repair ready, its invoice appears here
-                      for the cashier.
-                    </span>
-                  </div>
-                )}
-
-                {repairPickups.map((invoice) => {
-                  const balance = Number(invoice.balance_due);
-                  const paid = Number(invoice.paid_amount);
-                  return (
-                    <button
-                      type="button"
-                      className={
-                        selectedRepairInvoice?.ticket_id === invoice.ticket_id
-                          ? "repair-pickup-row is-selected"
-                          : "repair-pickup-row"
-                      }
-                      key={invoice.ticket_id}
-                      onClick={() => selectRepairPickup(invoice)}
-                    >
-                      <div>
-                        <strong>{invoice.ticket_number}</strong>
-                        <span>{invoice.customer_name}</span>
-                        <small>{invoice.device_description}</small>
-                      </div>
-                      <div>
-                        <strong>{money(Number(invoice.total_amount))}</strong>
-                        <span>
-                          {balance === 0
-                            ? "Fully paid"
-                            : paid > 0
-                              ? `${money(balance)} balance`
-                              : "Unpaid"}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="repair-pickup-detail">
-              {!selectedRepairInvoice && !lastCollectedRepair && (
-                <div className="pos-empty-state">
-                  <strong>Select a repair invoice</strong>
-                  <span>
-                    The cashier will see the invoice details, record payment, print,
-                    then complete collection from here.
-                  </span>
-                </div>
-              )}
-
-              {!selectedRepairInvoice && lastCollectedRepair && (
-                <article className="repair-collected-card">
-                  <header>
-                    <div>
-                      <p className="eyebrow">Collection complete</p>
-                      <h2>{lastCollectedRepair.ticket_number}</h2>
-                      <span>
-                        {lastCollectedRepair.invoice.customer_name} /{" "}
-                        {lastCollectedRepair.invoice.customer_phone}
-                      </span>
-                    </div>
-                    <StatusPill tone="success">Collected</StatusPill>
-                  </header>
-
-                  <div className="repair-pickup-device">
-                    <span>Device handed over</span>
-                    <strong>{lastCollectedRepair.invoice.device_description}</strong>
-                  </div>
-
-                  <div className="repair-pickup-totals">
-                    <div>
-                      <span>Total paid</span>
-                      <strong>
-                        {money(Number(lastCollectedRepair.invoice.total_amount))}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Status</span>
-                      <strong>{lastCollectedRepair.status.replace(/_/g, " ")}</strong>
-                    </div>
-                    <div className="repair-pickup-totals__balance">
-                      <span>Collected at</span>
-                      <strong>{dateLabel(lastCollectedRepair.collected_at)}</strong>
-                    </div>
-                  </div>
-
-                  <div className="repair-pickup-actions">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setRepairReceiptViewer(lastCollectedRepair.invoice)
-                      }
-                    >
-                      Print / view invoice
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => setLastCollectedRepair(null)}
-                    >
-                      Clear confirmation
-                    </button>
-                  </div>
-                </article>
-              )}
-
-              {selectedRepairInvoice && (
-                <>
-                  <header>
-                    <div>
-                      <p className="eyebrow">Selected repair invoice</p>
-                      <h2>{selectedRepairInvoice.ticket_number}</h2>
-                      <span>
-                        {selectedRepairInvoice.customer_name} /{" "}
-                        {selectedRepairInvoice.customer_phone}
-                      </span>
-                    </div>
-                    <StatusPill
-                      tone={
-                        selectedRepairBalance === 0
-                          ? "success"
-                          : selectedRepairPaid > 0
-                            ? "warning"
-                            : "neutral"
-                      }
-                    >
-                      {selectedRepairInvoice.payment_status.replace(/_/g, " ")}
-                    </StatusPill>
-                  </header>
-
-                  <div className="repair-pickup-device">
-                    <span>Device</span>
-                    <strong>{selectedRepairInvoice.device_description}</strong>
-                  </div>
-
-                  <div className="repair-pickup-totals">
-                    <div>
-                      <span>Labor</span>
-                      <strong>{money(Number(selectedRepairInvoice.labor_amount))}</strong>
-                    </div>
-                    <div>
-                      <span>Parts</span>
-                      <strong>{money(Number(selectedRepairInvoice.parts_amount))}</strong>
-                    </div>
-                    <div>
-                      <span>Paid</span>
-                      <strong>{money(selectedRepairPaid)}</strong>
-                    </div>
-                    <div className="repair-pickup-totals__balance">
-                      <span>Balance</span>
-                      <strong>{money(selectedRepairBalance)}</strong>
-                    </div>
-                  </div>
-
-                  <form
-                    className="repair-pickup-payment"
-                    onSubmit={recordRepairPickupPayment}
-                  >
-                    <label>
-                      Payment method
-                      <select
-                        name="repair_payment_method"
-                        value={repairPaymentMethod}
-                        onChange={(event) =>
-                          setRepairPaymentMethod(
-                            event.target.value as RepairPaymentMethod,
-                          )
-                        }
-                      >
-                        <option value="cash">Cash</option>
-                        <option value="mpesa">M-Pesa</option>
-                        <option value="card">Card</option>
-                      </select>
-                    </label>
-                    <label>
-                      Amount
-                      <input
-                        name="repair_payment_amount"
-                        type="number"
-                        min="0"
-                        max={selectedRepairBalance || undefined}
-                        value={repairPaymentAmount}
-                        onChange={(event) => setRepairPaymentAmount(event.target.value)}
-                        placeholder="0"
-                      />
-                    </label>
-                    {repairPaymentMethod !== "cash" && (
-                      <label>
-                        {repairPaymentMethod === "mpesa"
-                          ? "M-Pesa receipt code"
-                          : "Card reference"}
-                        <input
-                          name="repair_payment_reference"
-                          value={repairPaymentReference}
-                          onChange={(event) =>
-                            setRepairPaymentReference(event.target.value)
-                          }
-                          placeholder={
-                            repairPaymentMethod === "mpesa"
-                              ? "Optional: enter code if customer already paid"
-                              : "Card terminal approval/reference"
-                          }
-                        />
-                      </label>
-                    )}
-                    {repairPaymentMethod === "mpesa" && (
-                      <label>
-                        M-Pesa phone
-                        <input
-                          name="repair_mpesa_phone"
-                          value={repairMpesaPhone}
-                          onChange={(event) => setRepairMpesaPhone(event.target.value)}
-                          placeholder="07XXXXXXXX"
-                        />
-                        <small>
-                          Leave receipt code empty to send a customer STK prompt.
-                        </small>
-                      </label>
-                    )}
-                    <label>
-                      Notes
-                      <input
-                        name="repair_payment_notes"
-                        value={repairPaymentNotes}
-                        onChange={(event) => setRepairPaymentNotes(event.target.value)}
-                        placeholder="Optional cashier note"
-                      />
-                    </label>
-                    <button
-                      className="success-button"
-                      disabled={
-                        repairPickupBusy ||
-                        selectedRepairBalance <= 0 ||
-                        Boolean(token && !isPreview && !tillSession)
-                      }
-                    >
-                      {repairPickupBusy
-                        ? "Processing..."
-                        : repairPaymentMethod === "mpesa" &&
-                            !repairPaymentReference.trim()
-                          ? "Send M-Pesa prompt"
-                          : "Record payment"}
-                    </button>
-                  </form>
-
-                  {repairPaymentStatus && (
-                    <div className="repair-pickup-warning">
-                      {repairPaymentStatus}
-                    </div>
-                  )}
-
-                  {repairPendingPayment && repairPendingPayment.status === "pending" && (
-                    <section className="manual-mpesa-panel repair-mpesa-confirm">
-                      <div>
-                        <strong>Waiting for M-Pesa callback</strong>
-                        <span>
-                          If the customer has paid but the receipt has not appeared,
-                          enter the receipt code from their SMS.
-                        </span>
-                      </div>
-                      <label>
-                        M-Pesa receipt code
-                        <input
-                          name="repair_mpesa_receipt_code"
-                          value={repairMpesaReceiptCode}
-                          onChange={(event) =>
-                            setRepairMpesaReceiptCode(event.target.value)
-                          }
-                          placeholder="e.g. QH123ABC45"
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        disabled={repairPickupBusy || !repairMpesaReceiptCode.trim()}
-                        onClick={() => void manuallyCompleteRepairMpesaPayment()}
-                      >
-                        Confirm repair M-Pesa
-                      </button>
-                    </section>
-                  )}
-
-                  <section className="repair-pickup-payments">
-                    <header>
-                      <strong>Payment history</strong>
-                      <button
-                        type="button"
-                        onClick={() => setRepairReceiptViewer(selectedRepairInvoice)}
-                      >
-                        Open invoice
-                      </button>
-                    </header>
-                    {selectedRepairInvoice.payments.length === 0 && (
-                      <span>No repair payments recorded yet.</span>
-                    )}
-                    {selectedRepairInvoice.payments.length > 0 && (
-                      <table className="data-table data-table--compact">
-                        <thead>
-                          <tr>
-                            <th>Method</th>
-                            <th>Amount</th>
-                            <th>Reference</th>
-                            <th>Date</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedRepairInvoice.payments.map((payment) => (
-                            <tr
-                              key={`${payment.method}-${payment.provider_reference ?? payment.paid_at}-${payment.amount}`}
-                            >
-                              <td>{payment.method.toUpperCase()}</td>
-                              <td>{money(Number(payment.amount))}</td>
-                              <td>{payment.provider_reference ?? "—"}</td>
-                              <td>{dateLabel(payment.paid_at)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </section>
-
-                  <div className="repair-pickup-actions">
-                    {canCollectSelectedRepair ? (
-                      <button
-                        type="button"
-                        className="success-button"
-                        disabled={repairPickupBusy}
-                        onClick={() => void completeRepairPickup()}
-                      >
-                        {repairPickupBusy
-                          ? "Completing collection..."
-                          : "Hand over device"}
-                      </button>
-                    ) : (
-                      <div className="repair-action-hint">
-                        {collectRepairIssue}
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setRepairReceiptViewer(selectedRepairInvoice)}
-                    >
-                      Print / view invoice
-                    </button>
-                  </div>
-                </>
-              )}
-            </section>
-          </section>
+          <RepairPickupsTab desk={repairDesk} tillSession={tillSession} />
         )}
 
         {activeWorkspaceTab === "held" && (
-          <section className="pos-held-workspace">
-            {heldOrders.length === 0 && (
-              <div className="pos-empty-state">
-                <strong>No held orders</strong>
-                <span>
-                  Use Hold on the cart when a customer pauses checkout, then resume
-                  from here.
-                </span>
-              </div>
-            )}
-
-            {heldOrders.length > 0 && (
-              <div className="held-orders-list">
-                {heldOrders.map((order) => (
-                  <article className="held-order-card" key={order.id}>
-                    <div>
-                      <p className="eyebrow">Held order</p>
-                      <strong>{order.label}</strong>
-                      <span>
-                        {order.cart.length} line(s) / {money(order.total)}
-                      </span>
-                      <span>{dateLabel(order.createdAt)}</span>
-                      {order.customerPhone && <span>{order.customerPhone}</span>}
-                    </div>
-                    <div className="held-order-actions">
-                      <button type="button" onClick={() => resumeHeldOrder(order)}>
-                        Resume
-                      </button>
-                      <button
-                        type="button"
-                        className="danger-button"
-                        onClick={() => discardHeldOrder(order.id)}
-                      >
-                        Discard
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
+          <HeldOrdersTab
+            heldOrders={heldOrders}
+            onResume={resumeHeldOrder}
+            onDiscard={discardHeldOrder}
+          />
         )}
       </section>
 
       {receiptViewer && (
-        <div className="modal-backdrop" role="presentation">
-          <section
-            className="receipt-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Receipt"
-          >
-            <header className="receipt-modal__header">
-              <div>
-                <p className="eyebrow">Receipt</p>
-                <h2>{receiptViewer.invoice_number}</h2>
-                <span>
-                  {receiptViewer.branch_name} / {receiptViewer.branch_code}
-                </span>
-              </div>
-              <div className="table-actions">
-                <button onClick={printReceipt}>Print</button>
-                <button onClick={() => setReceiptViewer(null)}>Close</button>
-              </div>
-            </header>
-
-            <div className="receipt-paper">
-              <div className="receipt-brand">
-                <div>
-                  <p className="eyebrow">Crystal-shop POS</p>
-                  <h3>{receiptViewer.branch_name}</h3>
-                  <span>
-                    {receiptViewer.branch_address ??
-                      `${receiptViewer.branch_code} branch`}
-                  </span>
-                </div>
-                <div>
-                  <span>Invoice number</span>
-                  <strong>{receiptViewer.invoice_number}</strong>
-                  <span>{dateLabel(receiptViewer.completed_at)}</span>
-                </div>
-              </div>
-
-              <div className="receipt-paper__meta">
-                <div>
-                  <span>Cashier</span>
-                  <strong>{receiptViewer.cashier_name ?? "Cashier"}</strong>
-                </div>
-                <div>
-                  <span>Customer</span>
-                  <strong>{receiptViewer.customer_name ?? "Walk-in customer"}</strong>
-                </div>
-                <div>
-                  <span>Status</span>
-                  <strong>{receiptViewer.sale_status.replace(/_/g, " ")}</strong>
-                </div>
-                <div>
-                  <span>Sale date</span>
-                  <strong>{dateLabel(receiptViewer.completed_at)}</strong>
-                </div>
-              </div>
-
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Qty</th>
-                    <th>Unit</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {receiptViewer.items.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.description}</td>
-                      <td>{item.quantity}</td>
-                      <td>{money(Number(item.unit_price))}</td>
-                      <td>{money(Number(item.line_total))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <div className="receipt-totals">
-                <div>
-                  <span>Subtotal</span>
-                  <strong>{money(Number(receiptViewer.subtotal))}</strong>
-                </div>
-                <div>
-                  <span>Discount</span>
-                  <strong>{money(Number(receiptViewer.discount_amount))}</strong>
-                </div>
-                <div>
-                  <span>Paid</span>
-                  <strong>{money(Number(receiptViewer.paid_amount))}</strong>
-                </div>
-                <div className="receipt-totals__grand">
-                  <span>Total</span>
-                  <strong>{money(Number(receiptViewer.total_amount))}</strong>
-                </div>
-              </div>
-
-              <div className="receipt-payments">
-                <strong>Payments</strong>
-                {receiptViewer.payments.map((payment) => (
-                  <span key={`${payment.method}-${payment.paid_at ?? payment.amount}`}>
-                    {payment.method.toUpperCase()} / {money(Number(payment.amount))}
-                    {payment.provider_reference ? ` / Ref ${payment.provider_reference}` : ""}
-                    {payment.payer_phone ? ` / Payer ${payment.payer_phone}` : ""}
-                    {` / ${dateLabel(payment.paid_at)}`}
-                  </span>
-                ))}
-              </div>
-
-              <div className="receipt-footer-note">
-                <strong>Thank you for shopping with us.</strong>
-                <span>
-                  Keep this receipt for warranty, returns, and service tracking.
-                  Returns, voids, and refunds are subject to manager approval.
-                </span>
-              </div>
-            </div>
-          </section>
-        </div>
+        <ReceiptModal
+          receipt={receiptViewer}
+          onPrint={printReceipt}
+          onClose={() => setReceiptViewer(null)}
+        />
       )}
 
       {repairReceiptViewer && (
-        <div className="modal-backdrop" role="presentation">
-          <section
-            className="receipt-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Repair invoice"
-          >
-            <header className="receipt-modal__header">
-              <div>
-                <p className="eyebrow">Repair invoice</p>
-                <h2>{repairReceiptViewer.ticket_number}</h2>
-                <span>
-                  {repairReceiptViewer.customer_name} /{" "}
-                  {repairReceiptViewer.customer_phone}
-                </span>
-              </div>
-              <div className="table-actions">
-                <button onClick={printReceipt}>Print</button>
-                <button onClick={() => setRepairReceiptViewer(null)}>Close</button>
-              </div>
-            </header>
-
-            <div className="receipt-paper">
-              <div className="receipt-brand">
-                <div>
-                  <p className="eyebrow">Crystal-shop Repairs</p>
-                  <h3>{repairReceiptViewer.ticket_number}</h3>
-                  <span>{repairReceiptViewer.device_description}</span>
-                </div>
-                <div>
-                  <span>Receipt date</span>
-                  <strong>{repairReceiptViewer.payment_status.replace(/_/g, " ")}</strong>
-                  <span>{new Date().toLocaleString()}</span>
-                </div>
-              </div>
-
-              <div className="receipt-paper__meta">
-                <div>
-                  <span>Cashier</span>
-                  <strong>{user?.full_name ?? "Cashier"}</strong>
-                </div>
-                <div>
-                  <span>Customer</span>
-                  <strong>{repairReceiptViewer.customer_name}</strong>
-                </div>
-                <div>
-                  <span>Phone</span>
-                  <strong>{repairReceiptViewer.customer_phone}</strong>
-                </div>
-                <div>
-                  <span>Branch</span>
-                  <strong>Current branch</strong>
-                </div>
-              </div>
-
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Service offered</th>
-                    <th>Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>
-                      <strong>{repairReceiptViewer.service_description}</strong>
-                      <span>{repairReceiptViewer.device_description}</span>
-                    </td>
-                    <td>{money(Number(repairReceiptViewer.labor_amount))}</td>
-                  </tr>
-                  <tr>
-                    <td>Parts used during repair</td>
-                    <td>{money(Number(repairReceiptViewer.parts_amount))}</td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div className="receipt-totals">
-                <div>
-                  <span>Total</span>
-                  <strong>{money(Number(repairReceiptViewer.total_amount))}</strong>
-                </div>
-                <div>
-                  <span>Paid</span>
-                  <strong>{money(Number(repairReceiptViewer.paid_amount))}</strong>
-                </div>
-                <div className="receipt-totals__grand">
-                  <span>Balance</span>
-                  <strong>{money(Number(repairReceiptViewer.balance_due))}</strong>
-                </div>
-              </div>
-
-              <div className="receipt-payments">
-                <strong>Payments</strong>
-                {repairReceiptViewer.payments.length === 0 && (
-                  <span>No payments recorded yet.</span>
-                )}
-                {repairReceiptViewer.payments.map((payment) => (
-                  <span key={`${payment.method}-${payment.paid_at ?? payment.amount}`}>
-                    {payment.method.toUpperCase()} / {money(Number(payment.amount))}
-                    {payment.provider_reference ? ` / Ref ${payment.provider_reference}` : ""}
-                    {payment.payer_phone ? ` / Payer ${payment.payer_phone}` : ""}
-                    {` / ${dateLabel(payment.paid_at)}`}
-                  </span>
-                ))}
-              </div>
-
-              <div className="receipt-footer-note">
-                <strong>Thank you for trusting us with your device.</strong>
-                <span>
-                  Keep this repair receipt for warranty follow-up and future service
-                  tracking.
-                </span>
-              </div>
-            </div>
-          </section>
-        </div>
+        <RepairInvoiceModal
+          invoice={repairReceiptViewer}
+          cashierName={user?.full_name}
+          onPrint={printReceipt}
+          onClose={() => setRepairReceiptViewer(null)}
+        />
       )}
 
       {paymentOpen && (
-        <div className="modal-backdrop" role="presentation">
-          <section
-            className="payment-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Payment"
-          >
-            <header className="payment-modal__header">
-              <div>
-                <p className="eyebrow">Payment</p>
-                <h2>{money(paymentTotal)}</h2>
-                <span>Cashier: {user?.full_name}</span>
-              </div>
-              <button onClick={() => setPaymentOpen(false)}>Close</button>
-            </header>
-
-            <div className="payment-modal__body">
-              <section className="payment-method-panel">
-                <h3>Payment Method</h3>
-                <div className="payment-methods">
-                  {(["cash", "mpesa", "card", "split"] as PaymentMethod[]).map((method) => (
-                    <button
-                      key={method}
-                      className={paymentMethod === method ? "is-active" : ""}
-                      onClick={() => setPaymentMethod(method)}
-                    >
-                      {method === "mpesa" ? "M-Pesa" : method}
-                    </button>
-                  ))}
-                </div>
-                {paymentStatus && (
-                  <div className="payment-status-banner">
-                    <strong>Payment status</strong>
-                    <span>{paymentStatus}</span>
-                  </div>
-                )}
-                {pendingSale && (
-                  <section className="payment-attempts-panel">
-                    <header>
-                      <div>
-                        <strong>Payment attempts</strong>
-                        <span>
-                          Outstanding {money(paymentOutstanding)} / Paid{" "}
-                          {money(Number(pendingSale.paid_amount))}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={attemptsBusy}
-                        onClick={() => void refreshPaymentAttempts(pendingSale.id)}
-                      >
-                        {attemptsBusy ? "Loading..." : "Refresh"}
-                      </button>
-                    </header>
-
-                    {currentPaymentAttempts.length === 0 && (
-                      <div className="payment-attempts-empty">
-                        No payment attempts recorded yet.
-                      </div>
-                    )}
-
-                    {currentPaymentAttempts.map((attempt) => (
-                      <article className="payment-attempt-row" key={attempt.id}>
-                        <div>
-                          <strong>
-                            {attempt.method.replace(/_/g, " ").toUpperCase()} /{" "}
-                            {money(Number(attempt.amount))}
-                          </strong>
-                          <span>
-                            {attempt.provider_reference
-                              ? `Ref ${attempt.provider_reference}`
-                              : "No provider reference"}
-                          </span>
-                          {attempt.notes && <span>{attempt.notes}</span>}
-                        </div>
-                        <StatusPill tone={paymentStatusTone(attempt.status)}>
-                          {attempt.status.replace(/_/g, " ")}
-                        </StatusPill>
-                        {attempt.status === "pending" && (
-                          <div className="payment-attempt-actions">
-                            {attempt.method === "mpesa" && (
-                              <button
-                                type="button"
-                                disabled={paymentBusy}
-                                onClick={() => void checkMpesaAttempt(attempt)}
-                              >
-                                Check Status
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              disabled={paymentBusy}
-                              onClick={() =>
-                                void markAttemptOutcome(
-                                  attempt,
-                                  "cancelled",
-                                  "Cashier marked this attempt as cancelled by the customer.",
-                                )
-                              }
-                            >
-                              Customer Cancelled
-                            </button>
-                            <button
-                              type="button"
-                              disabled={paymentBusy}
-                              onClick={() =>
-                                void markAttemptOutcome(
-                                  attempt,
-                                  "failed",
-                                  "Cashier marked this attempt as timed out or declined.",
-                                )
-                              }
-                            >
-                              Mark Failed
-                            </button>
-                          </div>
-                        )}
-                      </article>
-                    ))}
-                    {Number(pendingSale.paid_amount) === 0 && (
-                      <button
-                        type="button"
-                        className="danger-button cancel-sale-button"
-                        disabled={paymentBusy}
-                        onClick={() => void cancelUnpaidSale()}
-                      >
-                        Cancel Unpaid Sale
-                      </button>
-                    )}
-                  </section>
-                )}
-                {paymentMethod === "split" && (
-                  <section className="split-payment-panel">
-                    <div className="split-payment-summary">
-                      <strong>Split this payment</strong>
-                      <StatusPill tone={splitTone}>
-                        {splitBalanceLabel(splitBalance)}
-                      </StatusPill>
-                      <span>Total selected: {money(splitTotal)}</span>
-                    </div>
-                    <div className="split-payment-tools">
-                      <button type="button" onClick={() => fillSplitAmount("cash")}>
-                        Fill cash balance
-                      </button>
-                      <button type="button" onClick={() => fillSplitAmount("mpesa")}>
-                        Fill M-Pesa balance
-                      </button>
-                      <button type="button" onClick={() => fillSplitAmount("card")}>
-                        Fill card balance
-                      </button>
-                    </div>
-                    <label>
-                      Cash amount
-                      <input
-                        type="number"
-                        min="0"
-                        value={splitAmounts.cash}
-                        onChange={(event) =>
-                          setSplitAmounts((current) => ({
-                            ...current,
-                            cash: event.target.value,
-                          }))
-                        }
-                        placeholder="0"
-                      />
-                    </label>
-                    <label>
-                      M-Pesa amount
-                      <input
-                        type="number"
-                        min="0"
-                        value={splitAmounts.mpesa}
-                        onChange={(event) =>
-                          setSplitAmounts((current) => ({
-                            ...current,
-                            mpesa: event.target.value,
-                          }))
-                        }
-                        placeholder="0"
-                      />
-                    </label>
-                    {splitMpesaAmount > 0 && (
-                      <label>
-                        M-Pesa phone
-                        <input
-                          value={mpesaPhone}
-                          onChange={(event) => setMpesaPhone(event.target.value)}
-                          placeholder="0712 345 678"
-                        />
-                      </label>
-                    )}
-                    <label>
-                      Card amount
-                      <input
-                        type="number"
-                        min="0"
-                        value={splitAmounts.card}
-                        onChange={(event) =>
-                          setSplitAmounts((current) => ({
-                            ...current,
-                            card: event.target.value,
-                          }))
-                        }
-                        placeholder="0"
-                      />
-                    </label>
-                    {splitCardAmount > 0 && (
-                      <label>
-                        Card reference
-                        <input
-                          value={splitCardReference}
-                          onChange={(event) => setSplitCardReference(event.target.value)}
-                          placeholder="Card approval/reference number"
-                        />
-                      </label>
-                    )}
-                  </section>
-                )}
-                {paymentMethod === "mpesa" && (
-                  <label className="payment-reference">
-                    Customer M-Pesa phone
-                    <input
-                      value={mpesaPhone}
-                      onChange={(event) => setMpesaPhone(event.target.value)}
-                      placeholder="0712 345 678 or 254712345678"
-                    />
-                  </label>
-                )}
-                {paymentMethod === "card" && (
-                  <section className="card-payment-panel">
-                    <label className="payment-reference">
-                      Card reference
-                      <input
-                        value={paymentReference}
-                        onChange={(event) => setPaymentReference(event.target.value)}
-                        placeholder="Card approval/reference number"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      className="danger-button"
-                      disabled={paymentBusy}
-                      onClick={() => void recordCardDecline()}
-                    >
-                      Card Declined
-                    </button>
-                  </section>
-                )}
-                {pendingSale &&
-                  (paymentMethod === "mpesa" ||
-                    (paymentMethod === "split" && splitMpesaAmount > 0)) && (
-                    <section className="manual-mpesa-panel">
-                      <div>
-                        <strong>Paid but callback is slow?</strong>
-                        <span>
-                          Enter the M-Pesa receipt code from the customer's SMS to
-                          generate the receipt immediately.
-                        </span>
-                      </div>
-                      <label>
-                        M-Pesa receipt code
-                        <input
-                          value={mpesaReceiptCode}
-                          onChange={(event) => setMpesaReceiptCode(event.target.value)}
-                          placeholder="e.g. QG12ABCDEF"
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        disabled={paymentBusy}
-                        onClick={() => void manuallyCompleteMpesaPayment()}
-                      >
-                        Confirm M-Pesa Payment
-                      </button>
-                    </section>
-                  )}
-                <table className="payment-table">
-                  <tbody>
-                    <tr>
-                      <th>Subtotal</th>
-                      <td>{money(paymentSubtotal)}</td>
-                    </tr>
-                    <tr>
-                      <th>Discount</th>
-                      <td>{money(paymentDiscount)}</td>
-                    </tr>
-                    <tr>
-                      <th>Net Payable</th>
-                      <td>{money(paymentTotal)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </section>
-
-              <section className="numpad-panel">
-                <div className="numpad-display">{money(paymentTotal)}</div>
-                <div className="numpad">
-                  {["7", "8", "9", "4", "5", "6", "1", "2", "3", "0", ".", "Clear"].map(
-                    (key) => (
-                      <button key={key}>{key}</button>
-                    ),
-                  )}
-                </div>
-                <button
-                  className="success-button confirm-payment"
-                  disabled={paymentBusy || isRecoveringPendingSale}
-                  onClick={completePayment}
-                >
-                  {isRecoveringPendingSale
-                    ? "Use Receipt Code Above"
-                    : paymentBusy
-                    ? paymentMethod === "mpesa"
-                      ? "Waiting for M-Pesa..."
-                      : paymentMethod === "split"
-                        ? "Processing Split..."
-                      : "Completing..."
-                    : paymentMethod === "mpesa"
-                      ? "Send M-Pesa Prompt"
-                      : paymentMethod === "split"
-                        ? "Complete Split Payment"
-                      : "Confirm Payment"}
-                </button>
-              </section>
-            </div>
-          </section>
-        </div>
+        <PaymentModal
+          cashierName={user?.full_name}
+          paymentTotal={paymentTotal}
+          paymentSubtotal={paymentSubtotal}
+          paymentDiscount={paymentDiscount}
+          paymentOutstanding={paymentOutstanding}
+          onClose={() => setPaymentOpen(false)}
+          paymentMethod={paymentMethod}
+          setPaymentMethod={setPaymentMethod}
+          paymentStatus={paymentStatus}
+          pendingSale={pendingSale}
+          attemptsBusy={attemptsBusy}
+          currentPaymentAttempts={currentPaymentAttempts}
+          paymentBusy={paymentBusy}
+          refreshPaymentAttempts={refreshPaymentAttempts}
+          checkMpesaAttempt={checkMpesaAttempt}
+          markAttemptOutcome={markAttemptOutcome}
+          cancelUnpaidSale={cancelUnpaidSale}
+          splitTone={splitTone}
+          splitBalance={splitBalance}
+          splitTotal={splitTotal}
+          fillSplitAmount={fillSplitAmount}
+          splitAmounts={splitAmounts}
+          setSplitAmounts={setSplitAmounts}
+          splitMpesaAmount={splitMpesaAmount}
+          splitCardAmount={splitCardAmount}
+          mpesaPhone={mpesaPhone}
+          setMpesaPhone={setMpesaPhone}
+          splitCardReference={splitCardReference}
+          setSplitCardReference={setSplitCardReference}
+          paymentReference={paymentReference}
+          setPaymentReference={setPaymentReference}
+          recordCardDecline={recordCardDecline}
+          mpesaReceiptCode={mpesaReceiptCode}
+          setMpesaReceiptCode={setMpesaReceiptCode}
+          manuallyCompleteMpesaPayment={manuallyCompleteMpesaPayment}
+          isRecoveringPendingSale={isRecoveringPendingSale}
+          completePayment={completePayment}
+        />
       )}
     </section>
   );
