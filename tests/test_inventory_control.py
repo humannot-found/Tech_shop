@@ -9,7 +9,12 @@ from backend.core.permissions import BRANCH_MANAGER, CASHIER, INVENTORY_MANAGER
 from backend.main import app
 from backend.models.database import get_db
 from backend.schemas.approval_schemas import ApprovalDecision
-from backend.schemas.inventory_schemas import StockAdjustmentCreate, StockTransferCreate
+from backend.schemas.inventory_schemas import (
+    ReorderLevelItem,
+    ReorderLevelUpdate,
+    StockAdjustmentCreate,
+    StockTransferCreate,
+)
 from backend.services import inventory_control
 from backend.services import stocktake as stocktake_service
 from backend.services import transfers as transfer_service
@@ -129,3 +134,31 @@ def test_branch_manager_can_reach_inventory_controls(monkeypatch) -> None:
         client.get("/api/v1/staff/inventory/stock-counts", params=params).status_code
         == 200
     )
+
+
+def test_reorder_level_update_rejects_duplicates_and_negative_levels() -> None:
+    variant_id = uuid4()
+    with pytest.raises(PydanticValidationError):
+        ReorderLevelUpdate(
+            branch_id=uuid4(),
+            items=[
+                ReorderLevelItem(variant_id=variant_id, reorder_level=2),
+                ReorderLevelItem(variant_id=variant_id, reorder_level=3),
+            ],
+        )
+    with pytest.raises(PydanticValidationError):
+        ReorderLevelItem(variant_id=variant_id, reorder_level=-1)
+
+
+def test_cashier_cannot_set_reorder_levels() -> None:
+    actor = principal(CASHIER, {"inventory.view"})
+    payload = ReorderLevelUpdate(
+        branch_id=actor.branch_id,
+        items=[ReorderLevelItem(variant_id=uuid4(), reorder_level=2)],
+    )
+    with pytest.raises(AuthorizationError):
+        inventory_control.set_reorder_levels(object(), actor, payload)
+
+
+def test_reorder_levels_route_is_exposed() -> None:
+    assert "/api/v1/staff/inventory/reorder-levels" in app.openapi()["paths"]

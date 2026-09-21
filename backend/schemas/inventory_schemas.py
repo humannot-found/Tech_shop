@@ -18,8 +18,26 @@ class StockBalanceResponse(ModelResponse):
     last_stock_take_at: datetime | None
 
 
+class ReorderLevelItem(BaseSchema):
+    variant_id: UUID
+    reorder_level: int = Field(ge=0, le=1_000_000)
+
+
+class ReorderLevelUpdate(BaseSchema):
+    branch_id: UUID
+    items: list[ReorderLevelItem] = Field(min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def variants_are_unique(self) -> "ReorderLevelUpdate":
+        ids = [item.variant_id for item in self.items]
+        if len(ids) != len(set(ids)):
+            raise ValueError("each variant can only appear once")
+        return self
+
+
 class InventoryBalanceView(BaseSchema):
-    stock_balance_id: UUID
+    # None for a catalog item this branch has never received.
+    stock_balance_id: UUID | None
     branch_id: UUID
     product_id: UUID
     product_name: str

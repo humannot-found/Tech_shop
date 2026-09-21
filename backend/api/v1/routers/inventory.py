@@ -9,6 +9,7 @@ from backend.schemas.approval_schemas import ApprovalDecision, ApprovalRequestRe
 from backend.schemas.base_schemas import Page
 from backend.schemas.inventory_schemas import (
     InventoryBalanceView,
+    ReorderLevelUpdate,
     SerializedUnitView,
     StockAdjustmentCreate,
     StockMovementResponse,
@@ -46,6 +47,7 @@ def list_balances(
     page_size: int = Query(default=50, ge=1, le=200),
     query: str | None = Query(default=None, min_length=1, max_length=150),
     low_stock_only: bool = False,
+    include_unstocked: bool = False,
 ) -> Page[InventoryBalanceView]:
     items, total = inventory_control.list_balances(
         db,
@@ -55,10 +57,23 @@ def list_balances(
         page_size=page_size,
         query=query,
         low_stock_only=low_stock_only,
+        include_unstocked=include_unstocked,
     )
     return Page[InventoryBalanceView](
         items=items, total=total, page=page, page_size=page_size
     )
+
+
+@router.put("/reorder-levels", response_model=list[InventoryBalanceView])
+def set_reorder_levels(
+    payload: ReorderLevelUpdate,
+    principal: InventoryAdjustPrincipal,
+    db: DatabaseSession,
+) -> list[InventoryBalanceView]:
+    """Sets low-stock reorder levels, creating a stock record for never-received items."""
+    items = inventory_control.set_reorder_levels(db, principal, payload)
+    db.commit()
+    return items
 
 
 @router.get("/serialized-units", response_model=Page[SerializedUnitView])

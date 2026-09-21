@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.core.permissions import ADMIN, BRANCH_MANAGER
@@ -12,6 +12,7 @@ from backend.models.products import Product, ProductVariant
 from backend.schemas.approval_schemas import ApprovalDecision, ApprovalRequestResponse
 from backend.schemas.inventory_schemas import (
     InventoryBalanceView,
+    ReorderLevelUpdate,
     SerializedUnitView,
     StockAdjustmentCreate,
     StockMovementResponse,
@@ -27,6 +28,30 @@ from backend.services.authorization import (
 from backend.services.exceptions import ConflictError, NotFoundError
 
 
+def _balance_view(
+    balance: StockBalance | None, variant: ProductVariant, product: Product, branch_id: UUID
+) -> InventoryBalanceView:
+    on_hand = balance.quantity_on_hand if balance else 0
+    reserved = balance.reserved_quantity if balance else 0
+    reorder_level = balance.reorder_level if balance else 0
+    available = on_hand - reserved
+    return InventoryBalanceView(
+        stock_balance_id=balance.id if balance else None,
+        branch_id=branch_id,
+        product_id=product.id,
+        product_name=product.name,
+        variant_id=variant.id,
+        variant_name=variant.name,
+        sku=variant.sku,
+        quantity_on_hand=on_hand,
+        reserved_quantity=reserved,
+        available_quantity=available,
+        reorder_level=reorder_level,
+        # An item this branch has never received is not "low", it is not stocked yet.
+        is_low_stock=balance is not None and available <= reorder_level,
+    )
+
+
 def list_balances(
     db: Session,
     principal: AuthPrincipal,
@@ -36,12 +61,11 @@ def list_balances(
     page_size: int,
     query: str | None = None,
     low_stock_only: bool = False,
+    include_unstocked: bool = False,
 ) -> tuple[list[InventoryBalanceView], int]:
     enforce_permission(principal, "inventory.view")
     enforce_branch_scope(principal, branch_id)
     conditions = [
-        StockBalance.branch_id == branch_id,
-        StockBalance.is_deleted.is_(False),
         ProductVariant.is_deleted.is_(False),
         Product.is_deleted.is_(False),
     ]
@@ -55,42 +79,107 @@ def list_balances(
             )
         )
     if low_stock_only:
+        conditions.append(StockBalance.id.is_not(None))
         conditions.append(
             (StockBalance.quantity_on_hand - StockBalance.reserved_quantity)
             <= StockBalance.reorder_level
         )
     base = (
         select(StockBalance, ProductVariant, Product)
-        .join(ProductVariant, ProductVariant.id == StockBalance.variant_id)
+        .select_from(ProductVariant)
         .join(Product, Product.id == ProductVariant.product_id)
+        .outerjoin(
+            StockBalance,
+            and_(
+                StockBalance.variant_id == ProductVariant.id,
+                StockBalance.branch_id == branch_id,
+                StockBalance.is_deleted.is_(False),
+            ),
+        )
         .where(*conditions)
     )
+    if include_unstocked:
+        base = base.where(
+            or_(
+                StockBalance.id.is_not(None),
+                and_(ProductVariant.is_active.is_(True), Product.is_active.is_(True)),
+            )
+        )
+    else:
+        base = base.where(StockBalance.id.is_not(None))
     total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
     rows = db.execute(
         base.order_by(Product.name, ProductVariant.name)
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()
-    items = []
-    for balance, variant, product in rows:
-        available = balance.quantity_on_hand - balance.reserved_quantity
-        items.append(
-            InventoryBalanceView(
-                stock_balance_id=balance.id,
-                branch_id=balance.branch_id,
-                product_id=product.id,
-                product_name=product.name,
-                variant_id=variant.id,
-                variant_name=variant.name,
-                sku=variant.sku,
-                quantity_on_hand=balance.quantity_on_hand,
-                reserved_quantity=balance.reserved_quantity,
-                available_quantity=available,
-                reorder_level=balance.reorder_level,
-                is_low_stock=available <= balance.reorder_level,
-            )
+    return [
+        _balance_view(balance, variant, product, branch_id)
+        for balance, variant, product in rows
+    ], total
+
+
+def set_reorder_levels(
+    db: Session, principal: AuthPrincipal, payload: ReorderLevelUpdate
+) -> list[InventoryBalanceView]:
+    enforce_permission(principal, "inventory.adjust")
+    enforce_branch_scope(principal, payload.branch_id)
+    variant_ids = [item.variant_id for item in payload.items]
+    rows = db.execute(
+        select(ProductVariant, Product)
+        .join(Product, Product.id == ProductVariant.product_id)
+        .where(
+            ProductVariant.id.in_(variant_ids),
+            ProductVariant.is_deleted.is_(False),
+            Product.is_deleted.is_(False),
         )
-    return items, total
+    ).all()
+    catalog = {variant.id: (variant, product) for variant, product in rows}
+    if set(catalog) != set(variant_ids):
+        raise NotFoundError("one or more product variants were not found")
+    balances = {
+        balance.variant_id: balance
+        for balance in db.scalars(
+            select(StockBalance)
+            .where(
+                StockBalance.branch_id == payload.branch_id,
+                StockBalance.variant_id.in_(variant_ids),
+                StockBalance.is_deleted.is_(False),
+            )
+            .with_for_update()
+        ).all()
+    }
+    results = []
+    for item in payload.items:
+        variant, product = catalog[item.variant_id]
+        balance = balances.get(item.variant_id)
+        before = balance.reorder_level if balance else None
+        if balance is None:
+            balance = StockBalance(
+                branch_id=payload.branch_id,
+                variant_id=variant.id,
+                quantity_on_hand=0,
+                reserved_quantity=0,
+                reorder_level=item.reorder_level,
+                average_unit_cost=variant.cost_price,
+            )
+            db.add(balance)
+        else:
+            balance.reorder_level = item.reorder_level
+        db.flush()
+        if before != item.reorder_level:
+            record_audit(
+                db,
+                actor_id=principal.user_id,
+                branch_id=payload.branch_id,
+                action="inventory.reorder_level_set",
+                resource_type="stock_balance",
+                resource_id=balance.id,
+                before={"reorder_level": before},
+                after={"reorder_level": item.reorder_level, "sku": variant.sku},
+            )
+        results.append(_balance_view(balance, variant, product, payload.branch_id))
+    return results
 
 
 def list_serialized_units(

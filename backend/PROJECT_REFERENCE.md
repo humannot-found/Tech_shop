@@ -399,7 +399,8 @@ matching `backend/schemas/*_schemas.py` file or in Swagger.
 
 | Method | Path | Params | Body | What it does |
 | --- | --- | --- | --- | --- |
-| GET | `/inventory/balances` | `branch_id`, `page`, `page_size`, `query`, `low_stock_only` query | - | Lists branch stock balances |
+| GET | `/inventory/balances` | `branch_id`, `page`, `page_size`, `query`, `low_stock_only`, `include_unstocked` query | - | Lists branch stock balances; `include_unstocked` also lists active catalog items this branch has never received (`stock_balance_id` is null) |
+| PUT | `/inventory/reorder-levels` | - | `ReorderLevelUpdate` | Sets low-stock reorder levels for up to 200 variants, creating an empty stock record for never-received items (`inventory.adjust`) |
 | GET | `/inventory/serialized-units` | `branch_id`, `page`, `page_size`, `query`, `status` query | - | Lists serialized/IMEI units |
 | GET | `/inventory/movements` | `branch_id`, `page`, `page_size`, `variant_id` query | - | Lists costed movement ledger |
 | GET | `/inventory/adjustment-requests` | `branch_id` query | - | Lists stock adjustment approvals |
