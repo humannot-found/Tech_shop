@@ -155,3 +155,17 @@ def test_cashier_cannot_list_branch_returns() -> None:
     actor = principal(CASHIER, {"sales.process"})
     with pytest.raises(AuthorizationError):
         return_service.list_branch_returns(object(), actor, actor.branch_id)
+
+
+def test_warranty_coverage_reports_active_expired_and_stored_status() -> None:
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+
+    now = datetime(2026, 9, 21, tzinfo=timezone.utc)
+
+    def warranty(days: int, status: str = "active"):
+        return SimpleNamespace(end_date=now + timedelta(days=days), status=status)
+
+    assert sale_service.warranty_coverage(warranty(30), now) == ("active", 30)
+    assert sale_service.warranty_coverage(warranty(-2), now) == ("expired", 0)
+    assert sale_service.warranty_coverage(warranty(30, "void"), now) == ("void", 30)

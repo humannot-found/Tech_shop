@@ -445,7 +445,7 @@ matching `backend/schemas/*_schemas.py` file or in Swagger.
 | GET | `/pos/sales/{sale_id}/returns` | `sale_id` path | - | Lists returns for sale |
 | POST | `/pos/sales/{sale_id}/returns` | `sale_id` path | `SaleReturnCreate` | Requests product return |
 | POST | `/pos/returns/{return_id}/decision` | `return_id` path | `ApprovalDecision` | Approves/rejects return and refund |
-| GET | `/pos/warranties/lookup` | `identifier` query | - | Looks up warranty by serial/IMEI |
+| GET | `/pos/warranties/lookup` | `identifier` query | - | Looks up warranty by serial/IMEI; returns `WarrantyLookupResponse` (coverage, days remaining, device, invoice, customer) |
 
 ### Online orders
 

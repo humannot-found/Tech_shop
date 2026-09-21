@@ -11,3 +11,17 @@ class WarrantyResponse(ModelResponse):
     start_date: datetime
     end_date: datetime
     status: str
+
+
+class WarrantyLookupResponse(WarrantyResponse):
+    """A warranty with the details a cashier needs at the counter."""
+
+    coverage: str
+    days_remaining: int
+    unit_identifier: str | None
+    description: str
+    sale_id: UUID
+    invoice_number: str
+    sold_at: datetime | None
+    customer_name: str | None
+    customer_phone: str | None

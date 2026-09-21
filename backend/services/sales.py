@@ -40,7 +40,7 @@ from backend.schemas.sales_schemas import (
     ReceiptResponse,
     SaleCreate,
 )
-from backend.schemas.warranty_schemas import WarrantyResponse
+from backend.schemas.warranty_schemas import WarrantyLookupResponse, WarrantyResponse
 from backend.services import inventory
 from backend.services.audit import record_audit
 from backend.services.auth import (
@@ -824,23 +824,52 @@ def receipt(db: Session, principal: AuthPrincipal, sale_id: UUID) -> ReceiptResp
     return receipt_for_sale(db, sale)
 
 
+def warranty_coverage(warranty: Warranty, now: datetime) -> tuple[str, int]:
+    """Returns (coverage, whole days left); coverage is active, expired or the stored status."""
+    days_remaining = max(0, (warranty.end_date - now).days)
+    if warranty.status != "active":
+        return warranty.status, days_remaining
+    if warranty.end_date < now:
+        return "expired", 0
+    return "active", days_remaining
+
+
 def lookup_warranty(
     db: Session, principal: AuthPrincipal, identifier: str
-) -> WarrantyResponse:
+) -> WarrantyLookupResponse:
     enforce_permission(principal, "sales.process")
+    needle = identifier.strip()
     row = db.execute(
-        select(Warranty, Sale)
+        select(Warranty, Sale, SaleItem, SerializedUnit)
         .join(SerializedUnit, SerializedUnit.id == Warranty.serialized_unit_id)
         .join(SaleItem, SaleItem.id == Warranty.sale_item_id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(
-            (func.lower(SerializedUnit.serial_number) == identifier.strip().lower())
-            | (SerializedUnit.imei == identifier.strip()),
+            (func.lower(SerializedUnit.serial_number) == needle.lower())
+            | (SerializedUnit.imei == needle),
             Warranty.is_deleted.is_(False),
         )
+        .order_by(Warranty.start_date.desc())
     ).first()
     if row is None:
         raise NotFoundError("warranty not found")
-    warranty, sale = row
+    warranty, sale, item, unit = row
     enforce_branch_scope(principal, sale.branch_id)
-    return WarrantyResponse.model_validate(warranty)
+    customer = (
+        db.get(Customer, warranty.customer_id or sale.customer_id)
+        if (warranty.customer_id or sale.customer_id)
+        else None
+    )
+    coverage, days_remaining = warranty_coverage(warranty, datetime.now(timezone.utc))
+    return WarrantyLookupResponse(
+        **WarrantyResponse.model_validate(warranty).model_dump(),
+        coverage=coverage,
+        days_remaining=days_remaining,
+        unit_identifier=unit.imei or unit.serial_number,
+        description=item.description,
+        sale_id=sale.id,
+        invoice_number=sale.invoice_number,
+        sold_at=sale.completed_at,
+        customer_name=customer.full_name if customer else None,
+        customer_phone=customer.phone if customer else None,
+    )

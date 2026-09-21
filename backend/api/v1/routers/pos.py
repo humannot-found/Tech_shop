@@ -32,7 +32,7 @@ from backend.schemas.sales_schemas import (
     TillSessionResponse,
     TillUpdate,
 )
-from backend.schemas.warranty_schemas import WarrantyResponse
+from backend.schemas.warranty_schemas import WarrantyLookupResponse
 from backend.services import customers as customer_service
 from backend.services import mpesa as mpesa_service
 from backend.services import returns as return_service
@@ -415,10 +415,10 @@ def decide_sale_return(
     return item
 
 
-@router.get("/warranties/lookup", response_model=WarrantyResponse)
+@router.get("/warranties/lookup", response_model=WarrantyLookupResponse)
 def lookup_warranty(
     principal: SalesPrincipal,
     db: DatabaseSession,
     identifier: str = Query(min_length=3, max_length=120),
-) -> WarrantyResponse:
+) -> WarrantyLookupResponse:
     return sale_service.lookup_warranty(db, principal, identifier)
