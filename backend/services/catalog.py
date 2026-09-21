@@ -469,7 +469,10 @@ def list_products(
     if query:
         search = f"%{query.strip()}%"
         sku_products = select(ProductVariant.product_id).where(
-            ProductVariant.sku.ilike(search),
+            or_(
+                ProductVariant.sku.ilike(search),
+                ProductVariant.barcode.ilike(search),
+            ),
             ProductVariant.is_deleted.is_(False),
         )
         conditions.append(
