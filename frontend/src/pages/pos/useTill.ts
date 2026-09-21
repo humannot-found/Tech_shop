@@ -9,8 +9,7 @@ type UseTillOptions = {
   isPreview: boolean;
   user: CurrentUser | null;
   setNotice: (message: string | null) => void;
-  cartLineCount: number;
-  heldOrderCount: number;
+  getCloseBlocker: () => string | null;
   onClosed: () => void;
 };
 
@@ -19,8 +18,7 @@ export function useTill({
   isPreview,
   user,
   setNotice,
-  cartLineCount,
-  heldOrderCount,
+  getCloseBlocker,
   onClosed,
 }: UseTillOptions) {
   const [tillSession, setTillSession] = useState<TillSession | null>(null);
@@ -68,12 +66,9 @@ export function useTill({
       setNotice("No live till session is open.");
       return;
     }
-    if (cartLineCount) {
-      setNotice("Clear or complete the current cart before closing the till.");
-      return;
-    }
-    if (heldOrderCount) {
-      setNotice("Resume or discard held orders before closing the till.");
+    const closeBlocker = getCloseBlocker();
+    if (closeBlocker) {
+      setNotice(closeBlocker);
       return;
     }
     if (closingCash.trim() === "") {
