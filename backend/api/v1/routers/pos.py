@@ -415,10 +415,13 @@ def decide_sale_return(
     return item
 
 
-@router.get("/warranties/lookup", response_model=WarrantyLookupResponse)
-def lookup_warranty(
+@router.get("/warranties/search", response_model=list[WarrantyLookupResponse])
+def search_warranties(
     principal: SalesPrincipal,
     db: DatabaseSession,
-    identifier: str = Query(min_length=3, max_length=120),
-) -> WarrantyLookupResponse:
-    return sale_service.lookup_warranty(db, principal, identifier)
+    q: str = Query(min_length=3, max_length=120),
+) -> list[WarrantyLookupResponse]:
+    """Finds warranties by IMEI, serial number, invoice number or customer phone."""
+    items = sale_service.search_warranties(db, principal, q)
+    db.commit()  # persists warranties marked expired during the search
+    return items

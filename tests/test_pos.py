@@ -54,7 +54,7 @@ def test_pos_routes_are_exposed() -> None:
     assert "/api/v1/staff/pos/sales/{sale_id}/receipt" in paths
     assert "/api/v1/staff/pos/sales/{sale_id}/void-requests" in paths
     assert "/api/v1/staff/pos/sales/{sale_id}/returns" in paths
-    assert "/api/v1/staff/pos/warranties/lookup" in paths
+    assert "/api/v1/staff/pos/warranties/search" in paths
     assert "/api/v1/staff/pos/returns" in paths
 
 
@@ -169,3 +169,13 @@ def test_warranty_coverage_reports_active_expired_and_stored_status() -> None:
     assert sale_service.warranty_coverage(warranty(30), now) == ("active", 30)
     assert sale_service.warranty_coverage(warranty(-2), now) == ("expired", 0)
     assert sale_service.warranty_coverage(warranty(30, "void"), now) == ("void", 30)
+
+
+def test_warranty_search_terms_detect_phone_numbers() -> None:
+    assert sale_service.warranty_search_terms(" INV-2026-ABC ") == ("inv-2026-abc", None)
+    assert sale_service.warranty_search_terms("0711 000 111") == ("0711 000 111", "711000111")
+    assert sale_service.warranty_search_terms("+254711000111") == (
+        "+254711000111",
+        "711000111",
+    )
+    assert sale_service.warranty_search_terms("123456") == ("123456", None)

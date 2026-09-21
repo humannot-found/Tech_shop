@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
 from backend.core.permissions import ADMIN, CASHIER
@@ -834,42 +834,75 @@ def warranty_coverage(warranty: Warranty, now: datetime) -> tuple[str, int]:
     return "active", days_remaining
 
 
-def lookup_warranty(
-    db: Session, principal: AuthPrincipal, identifier: str
-) -> WarrantyLookupResponse:
-    enforce_permission(principal, "sales.process")
-    needle = identifier.strip()
-    row = db.execute(
-        select(Warranty, Sale, SaleItem, SerializedUnit)
-        .join(SerializedUnit, SerializedUnit.id == Warranty.serialized_unit_id)
-        .join(SaleItem, SaleItem.id == Warranty.sale_item_id)
-        .join(Sale, Sale.id == SaleItem.sale_id)
+def expire_due_warranties(db: Session, now: datetime | None = None) -> int:
+    """Marks active warranties whose end date has passed as expired."""
+    result = db.execute(
+        update(Warranty)
         .where(
-            (func.lower(SerializedUnit.serial_number) == needle.lower())
-            | (SerializedUnit.imei == needle),
+            Warranty.status == "active",
+            Warranty.end_date < (now or datetime.now(timezone.utc)),
             Warranty.is_deleted.is_(False),
         )
+        .values(status="expired")
+    )
+    return result.rowcount or 0
+
+
+def warranty_search_terms(query: str) -> tuple[str, str | None]:
+    """Returns the lower-cased query and, if it looks like a phone number, its last 9 digits."""
+    needle = query.strip().lower()
+    digits = "".join(character for character in needle if character.isdigit())
+    return needle, (digits[-9:] if len(digits) >= 7 else None)
+
+
+def search_warranties(
+    db: Session, principal: AuthPrincipal, query: str
+) -> list[WarrantyLookupResponse]:
+    enforce_permission(principal, "sales.process")
+    expire_due_warranties(db)
+    needle, phone_suffix = warranty_search_terms(query)
+    raw = query.strip()
+    conditions = [
+        func.lower(SerializedUnit.serial_number) == needle,
+        SerializedUnit.imei == raw,
+        func.lower(Sale.invoice_number).contains(needle, autoescape=True),
+    ]
+    if phone_suffix is not None:
+        digits_only = func.regexp_replace(Customer.phone, r"\D", "", "g")
+        conditions.append(digits_only.endswith(phone_suffix, autoescape=True))
+
+    statement = (
+        select(Warranty, Sale, SaleItem, SerializedUnit, Customer)
+        .join(SaleItem, SaleItem.id == Warranty.sale_item_id)
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .outerjoin(SerializedUnit, SerializedUnit.id == Warranty.serialized_unit_id)
+        .outerjoin(
+            Customer,
+            Customer.id == func.coalesce(Warranty.customer_id, Sale.customer_id),
+        )
+        .where(Warranty.is_deleted.is_(False), or_(*conditions))
         .order_by(Warranty.start_date.desc())
-    ).first()
-    if row is None:
-        raise NotFoundError("warranty not found")
-    warranty, sale, item, unit = row
-    enforce_branch_scope(principal, sale.branch_id)
-    customer = (
-        db.get(Customer, warranty.customer_id or sale.customer_id)
-        if (warranty.customer_id or sale.customer_id)
-        else None
+        .limit(20)
     )
-    coverage, days_remaining = warranty_coverage(warranty, datetime.now(timezone.utc))
-    return WarrantyLookupResponse(
-        **WarrantyResponse.model_validate(warranty).model_dump(),
-        coverage=coverage,
-        days_remaining=days_remaining,
-        unit_identifier=unit.imei or unit.serial_number,
-        description=item.description,
-        sale_id=sale.id,
-        invoice_number=sale.invoice_number,
-        sold_at=sale.completed_at,
-        customer_name=customer.full_name if customer else None,
-        customer_phone=customer.phone if customer else None,
-    )
+    if principal.role_code != ADMIN:
+        statement = statement.where(Sale.branch_id == principal.branch_id)
+
+    now = datetime.now(timezone.utc)
+    results = []
+    for warranty, sale, item, unit, customer in db.execute(statement).all():
+        coverage, days_remaining = warranty_coverage(warranty, now)
+        results.append(
+            WarrantyLookupResponse(
+                **WarrantyResponse.model_validate(warranty).model_dump(),
+                coverage=coverage,
+                days_remaining=days_remaining,
+                unit_identifier=(unit.imei or unit.serial_number) if unit else None,
+                description=item.description,
+                sale_id=sale.id,
+                invoice_number=sale.invoice_number,
+                sold_at=sale.completed_at,
+                customer_name=customer.full_name if customer else None,
+                customer_phone=customer.phone if customer else None,
+            )
+        )
+    return results

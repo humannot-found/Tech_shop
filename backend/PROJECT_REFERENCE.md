@@ -260,6 +260,7 @@ Routers should not contain business logic. If a rule matters, put it in a servic
 | `backend/cli/bootstrap_admin.py` | Creates the first headquarters branch and Admin |
 | `backend/cli/seed_demo.py` | Seeds demo data across the whole backend |
 | `backend/cli/smoke.py` | Runs read-only DB/API smoke checks against seeded demo data |
+| `backend/cli/expire_warranties.py` | Marks past-due warranties as expired; safe to run on a schedule |
 | `backend/migrations/env.py` | Alembic environment and metadata import |
 | `backend/migrations/script.py.mako` | Alembic migration template |
 | `backend/migrations/versions/777154bd1cf1_initial_tables.py` | Initial database schema |
@@ -445,7 +446,7 @@ matching `backend/schemas/*_schemas.py` file or in Swagger.
 | GET | `/pos/sales/{sale_id}/returns` | `sale_id` path | - | Lists returns for sale |
 | POST | `/pos/sales/{sale_id}/returns` | `sale_id` path | `SaleReturnCreate` | Requests product return |
 | POST | `/pos/returns/{return_id}/decision` | `return_id` path | `ApprovalDecision` | Approves/rejects return and refund |
-| GET | `/pos/warranties/lookup` | `identifier` query | - | Looks up warranty by serial/IMEI; returns `WarrantyLookupResponse` (coverage, days remaining, device, invoice, customer) |
+| GET | `/pos/warranties/search` | `q` query | - | Finds warranties by IMEI, serial, invoice number or customer phone; returns up to 20 `WarrantyLookupResponse` rows and marks past-due warranties expired |
 
 ### Online orders
 
