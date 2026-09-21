@@ -9,17 +9,30 @@ from backend.core.permissions import ADMIN, BRANCH_MANAGER
 from backend.models.enums import (
     CashMovementKind,
     PaymentDirection,
+    SaleStatus,
     PaymentMethod,
     PaymentStatus,
     TillSessionStatus,
 )
 from backend.models.payments import Payment
-from backend.models.sales import Till, TillCashMovement, TillSession
+from backend.models.branch import Branch
+from backend.models.sales import (
+    Sale,
+    SaleItem,
+    SaleReturn,
+    Till,
+    TillCashMovement,
+    TillSession,
+)
+from backend.models.users import User
 from backend.schemas.sales_schemas import (
     TillCashMovementCreate,
     TillCashMovementResponse,
     TillCreate,
+    ShiftMovementLine,
+    ShiftPaymentLine,
     TillDrawerSummary,
+    TillShiftReport,
     TillSessionClose,
     TillSessionOpen,
     TillUpdate,
@@ -272,6 +285,147 @@ def drawer_summary(
     totals = _cash_totals(db, session)
     return TillDrawerSummary(
         till_session_id=session.id, opening_float=session.opening_float, **totals
+    )
+
+
+def shift_report(
+    db: Session, principal: AuthPrincipal, session_id: UUID
+) -> TillShiftReport:
+    session = _get_session_for_view(db, principal, session_id)
+    till = db.get(Till, session.till_id)
+    branch = db.get(Branch, till.branch_id) if till else None
+    cashier = db.get(User, session.cashier_id)
+    zero = Decimal("0.00")
+
+    sale_row = db.execute(
+        select(
+            func.count(Sale.id),
+            func.coalesce(func.sum(Sale.subtotal), zero),
+            func.coalesce(func.sum(Sale.discount_amount), zero),
+            func.coalesce(func.sum(Sale.total_amount), zero),
+        ).where(
+            Sale.till_session_id == session.id,
+            Sale.status == SaleStatus.COMPLETED,
+            Sale.is_deleted.is_(False),
+        )
+    ).one()
+    voided_count = db.scalar(
+        select(func.count(Sale.id)).where(
+            Sale.till_session_id == session.id,
+            Sale.status == SaleStatus.VOIDED,
+            Sale.is_deleted.is_(False),
+        )
+    ) or 0
+    items_sold = db.scalar(
+        select(func.coalesce(func.sum(SaleItem.quantity), 0))
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(
+            Sale.till_session_id == session.id,
+            Sale.status == SaleStatus.COMPLETED,
+            Sale.is_deleted.is_(False),
+            SaleItem.is_deleted.is_(False),
+        )
+    ) or 0
+
+    payment_rows = db.execute(
+        select(Payment.method, Payment.direction, func.sum(Payment.amount))
+        .where(
+            Payment.till_session_id == session.id,
+            Payment.status == PaymentStatus.COMPLETED,
+            Payment.is_deleted.is_(False),
+        )
+        .group_by(Payment.method, Payment.direction)
+    ).all()
+    by_method: dict[str, dict[str, Decimal]] = {}
+    for method, direction, total in payment_rows:
+        line = by_method.setdefault(
+            method.value, {"received": zero, "refunded": zero}
+        )
+        key = "received" if direction == PaymentDirection.INCOMING else "refunded"
+        line[key] += total or zero
+    payments = [
+        ShiftPaymentLine(
+            method=method,
+            received=values["received"],
+            refunded=values["refunded"],
+            net=values["received"] - values["refunded"],
+        )
+        for method, values in sorted(by_method.items())
+    ]
+    refunds_total = sum((value["refunded"] for value in by_method.values()), zero)
+    repair_payments = db.scalar(
+        select(func.coalesce(func.sum(Payment.amount), zero)).where(
+            Payment.till_session_id == session.id,
+            Payment.repair_ticket_id.is_not(None),
+            Payment.direction == PaymentDirection.INCOMING,
+            Payment.status == PaymentStatus.COMPLETED,
+            Payment.is_deleted.is_(False),
+        )
+    ) or zero
+    return_count = db.scalar(
+        select(func.count(SaleReturn.id)).where(
+            SaleReturn.till_session_id == session.id,
+            SaleReturn.status == "approved",
+            SaleReturn.is_deleted.is_(False),
+        )
+    ) or 0
+
+    cash = _cash_totals(db, session)
+    movements = db.scalars(
+        select(TillCashMovement)
+        .where(
+            TillCashMovement.till_session_id == session.id,
+            TillCashMovement.is_deleted.is_(False),
+        )
+        .order_by(TillCashMovement.created_at)
+    ).all()
+
+    closed = session.status == TillSessionStatus.CLOSED
+    is_manager = principal.role_code == ADMIN or "tills.manage" in principal.permissions
+    show_expected = closed or is_manager
+    expected = (session.expected_cash if closed else cash["expected_cash"]) if show_expected else None
+    variance = (
+        session.closing_cash - session.expected_cash
+        if closed and session.closing_cash is not None and session.expected_cash is not None
+        else None
+    )
+    return TillShiftReport(
+        till_session_id=session.id,
+        till_name=till.name if till else "",
+        till_code=till.code if till else "",
+        branch_name=branch.name if branch else "",
+        cashier_name=cashier.full_name if cashier else "",
+        status=session.status,
+        opened_at=session.opened_at,
+        closed_at=session.closed_at,
+        sale_count=sale_row[0],
+        voided_count=voided_count,
+        items_sold=int(items_sold),
+        gross_sales=sale_row[1],
+        discounts=sale_row[2],
+        net_sales=sale_row[3],
+        repair_payments=repair_payments,
+        return_count=return_count,
+        refunds_total=refunds_total,
+        payments=payments,
+        opening_float=session.opening_float,
+        cash_sales=cash["cash_sales"],
+        cash_refunds=cash["cash_refunds"],
+        cash_in=cash["cash_in"],
+        paid_out=cash["paid_out"],
+        cash_drop=cash["cash_drop"],
+        expected_cash=expected,
+        closing_cash=session.closing_cash,
+        variance=variance,
+        movements=[
+            ShiftMovementLine(
+                kind=item.kind,
+                amount=item.amount,
+                reason=item.reason,
+                created_at=item.created_at,
+            )
+            for item in movements
+        ],
     )
 
 

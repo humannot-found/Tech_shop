@@ -63,6 +63,54 @@ class TillDrawerSummary(BaseSchema):
     expected_cash: Decimal
 
 
+class ShiftPaymentLine(BaseSchema):
+    method: str
+    received: Decimal
+    refunded: Decimal
+    net: Decimal
+
+
+class ShiftMovementLine(BaseSchema):
+    kind: CashMovementKind
+    amount: Decimal
+    reason: str
+    created_at: datetime
+
+
+class TillShiftReport(BaseSchema):
+    """End-of-shift (Z) report for one till session."""
+
+    till_session_id: UUID
+    till_name: str
+    till_code: str
+    branch_name: str
+    cashier_name: str
+    status: TillSessionStatus
+    opened_at: datetime
+    closed_at: datetime | None
+    sale_count: int
+    voided_count: int
+    items_sold: int
+    gross_sales: Decimal
+    discounts: Decimal
+    net_sales: Decimal
+    repair_payments: Decimal
+    return_count: int
+    refunds_total: Decimal
+    payments: list[ShiftPaymentLine]
+    opening_float: Decimal
+    cash_sales: Decimal
+    cash_refunds: Decimal
+    cash_in: Decimal
+    paid_out: Decimal
+    cash_drop: Decimal
+    # Hidden from the cashier while their own till is still open (blind count).
+    expected_cash: Decimal | None
+    closing_cash: Decimal | None
+    variance: Decimal | None
+    movements: list[ShiftMovementLine]
+
+
 class TillSessionClose(BaseSchema):
     closing_cash: Decimal = Field(ge=0)
 

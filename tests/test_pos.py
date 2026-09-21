@@ -56,6 +56,7 @@ def test_pos_routes_are_exposed() -> None:
     assert "/api/v1/staff/pos/sales/{sale_id}/returns" in paths
     assert "/api/v1/staff/pos/warranties/search" in paths
     assert "/api/v1/staff/pos/returns" in paths
+    assert "/api/v1/staff/pos/till-sessions/{session_id}/report" in paths
 
 
 def test_cashier_can_list_own_branch_sales(monkeypatch) -> None:

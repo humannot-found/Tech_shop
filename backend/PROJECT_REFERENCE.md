@@ -428,6 +428,7 @@ matching `backend/schemas/*_schemas.py` file or in Swagger.
 | GET | `/pos/till-sessions/current` | - | - | Gets current cashier open till session |
 | POST | `/pos/till-sessions/open` | - | `TillSessionOpen` | Opens till session |
 | GET | `/pos/till-sessions/{session_id}/drawer` | `session_id` path | - | Cash in the drawer: opening float, cash sales, cash refunds, cash in, paid-outs, drops, expected cash |
+| GET | `/pos/till-sessions/{session_id}/report` | `session_id` path | - | End-of-shift report: sales, payments by method, refunds, cash drawer and variance. Expected cash is hidden from the cashier while their own till is open |
 | GET | `/pos/till-sessions/{session_id}/cash-movements` | `session_id` path | - | Lists cash in, paid-outs and drops for a session (owner cashier or a till manager) |
 | POST | `/pos/till-sessions/{session_id}/cash-movements` | `session_id` path | `TillCashMovementCreate` | Records cash in, a paid-out or a drop on the cashier's own open till; taking out more than the drawer holds is rejected |
 | POST | `/pos/till-sessions/{session_id}/close` | `session_id` path | `TillSessionClose` | Closes till session |

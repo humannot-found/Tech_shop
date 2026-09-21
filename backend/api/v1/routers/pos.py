@@ -30,6 +30,7 @@ from backend.schemas.sales_schemas import (
     TillCreate,
     TillDrawerSummary,
     TillResponse,
+    TillShiftReport,
     TillSessionClose,
     TillSessionOpen,
     TillSessionResponse,
@@ -126,6 +127,13 @@ def till_drawer_summary(
     session_id: UUID, principal: SalesPrincipal, db: DatabaseSession
 ) -> TillDrawerSummary:
     return till_service.drawer_summary(db, principal, session_id)
+
+
+@router.get("/till-sessions/{session_id}/report", response_model=TillShiftReport)
+def till_shift_report(
+    session_id: UUID, principal: SalesPrincipal, db: DatabaseSession
+) -> TillShiftReport:
+    return till_service.shift_report(db, principal, session_id)
 
 
 @router.get(
