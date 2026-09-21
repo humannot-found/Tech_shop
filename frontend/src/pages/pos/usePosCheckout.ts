@@ -97,6 +97,7 @@ export function usePosCheckout({
   const [discountApproval, setDiscountApproval] =
     useState<DiscountApprovalPayload | null>(null);
   const [approvalOpen, setApprovalOpen] = useState(false);
+  const [cashTendered, setCashTendered] = useState("");
 
   const subtotal = cart.reduce(
     (total, item) => total + item.price * item.quantity,
@@ -166,6 +167,7 @@ export function usePosCheckout({
     setMpesaReceiptCode("");
     setSplitAmounts({ cash: "", mpesa: "", card: "" });
     setSplitCardReference("");
+    setCashTendered("");
     setPaymentStatus(
       `Enter the customer's M-Pesa receipt code to complete ${sale.invoice_number}.`,
     );
@@ -186,6 +188,7 @@ export function usePosCheckout({
     setPaymentAttempts([]);
     setSplitAmounts({ cash: "", mpesa: "", card: "" });
     setSplitCardReference("");
+    setCashTendered("");
     setPaymentStatus(null);
     setPaymentOpen(false);
     setNotice(message);
@@ -268,6 +271,7 @@ export function usePosCheckout({
     setMpesaReceiptCode("");
     setSplitAmounts({ cash: "", mpesa: "", card: "" });
     setSplitCardReference("");
+    setCashTendered("");
     setActiveCategory("All");
     setActiveWorkspaceTab("products");
     setQuery("");
@@ -559,6 +563,7 @@ export function usePosCheckout({
     setPaymentAttempts([]);
     setSplitAmounts({ cash: "", mpesa: "", card: "" });
     setSplitCardReference("");
+    setCashTendered("");
     setPaymentStatus(null);
     setPaymentOpen(false);
     setActiveWorkspaceTab("receipts");
@@ -824,6 +829,18 @@ export function usePosCheckout({
     }
 
     if (
+      paymentMethod === "cash" &&
+      cashTendered.trim() !== "" &&
+      Math.round(cashTendered ? Number(cashTendered) * 100 : 0) <
+        Math.round(paymentOutstanding * 100)
+    ) {
+      setNotice(
+        `The amount received is less than ${money(paymentOutstanding)}. Enter the full amount or clear it.`,
+      );
+      return;
+    }
+
+    if (
       pendingMpesaAttempt &&
       (paymentMethod === "mpesa" ||
         (paymentMethod === "split" && splitMpesaAmount > 0))
@@ -911,16 +928,26 @@ export function usePosCheckout({
         return;
       }
 
+      const received = paymentMethod === "cash" ? Number(cashTendered) || 0 : 0;
+      const changeDue = Math.max(0, Math.round((received - outstanding) * 100) / 100);
       await addSalePayment(token, sale.id, {
         method: paymentMethod,
         amount: outstanding,
         provider_reference: paymentMethod === "cash" ? null : paymentReference.trim(),
         ...payerDetails(paymentMethod === "cash" ? null : paymentReference),
         idempotency_key: idempotencyKey(),
-        notes: `POS ${paymentMethod} payment`,
+        notes:
+          paymentMethod === "cash" && received > 0
+            ? `POS cash payment. Received ${money(received)}, change ${money(changeDue)}.`
+            : `POS ${paymentMethod} payment`,
       });
 
-      await completeSaleReceipt(sale.id, "Sale completed successfully.");
+      await completeSaleReceipt(
+        sale.id,
+        changeDue > 0
+          ? `Sale completed. Give the customer ${money(changeDue)} change.`
+          : "Sale completed successfully.",
+      );
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not complete sale.");
       setPaymentStatus(error instanceof Error ? error.message : "Could not complete sale.");
@@ -967,6 +994,8 @@ export function usePosCheckout({
     paymentOutstanding,
     currentPaymentAttempts,
     isRecoveringPendingSale,
+    cashTendered,
+    setCashTendered,
     splitMpesaAmount,
     splitCardAmount,
     splitTotal,

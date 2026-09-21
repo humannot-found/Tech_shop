@@ -149,3 +149,16 @@ export const returnConditions = [
   { value: "damaged", label: "Damaged" },
   { value: "faulty", label: "Faulty" },
 ];
+
+/** Cash amounts a customer is likely to hand over for a bill, smallest first. */
+export function quickCashAmounts(outstanding: number) {
+  if (outstanding <= 0) return [];
+  const amounts = new Set<number>([Math.ceil(outstanding)]);
+  for (const step of [100, 500, 1000]) {
+    amounts.add(Math.ceil(outstanding / step) * step);
+  }
+  for (const note of [1000, 2000, 5000, 10000]) {
+    if (note >= outstanding) amounts.add(note);
+  }
+  return [...amounts].sort((a, b) => a - b).slice(0, 5);
+}

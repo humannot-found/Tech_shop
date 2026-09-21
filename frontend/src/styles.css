@@ -5664,3 +5664,40 @@ button:disabled {
   font: inherit;
   font-weight: 700;
 }
+
+/* Cash tendered and change */
+
+.cash-tender-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-soft);
+  font-size: 13px;
+}
+
+.cash-tender-summary .is-change {
+  color: var(--success, #16803c);
+}
+
+.cash-tender-summary .is-short {
+  color: var(--danger);
+}
+
+.quick-cash {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quick-cash button {
+  flex: 1 1 auto;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  font-weight: 700;
+}

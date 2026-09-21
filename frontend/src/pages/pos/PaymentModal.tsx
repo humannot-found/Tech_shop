@@ -3,7 +3,12 @@ import type { Dispatch, SetStateAction } from "react";
 import type { Payment, PosSale, StatusTone } from "../../api/types";
 import { StatusPill } from "../../components/StatusPill";
 import type { PaymentMethod, SplitMethod } from "./types";
-import { money, paymentStatusTone, splitBalanceLabel } from "./utils";
+import {
+  money,
+  paymentStatusTone,
+  quickCashAmounts,
+  splitBalanceLabel,
+} from "./utils";
 
 type PaymentModalProps = {
   cashierName: string | undefined;
@@ -43,6 +48,8 @@ type PaymentModalProps = {
   manuallyCompleteMpesaPayment: () => Promise<void>;
   isRecoveringPendingSale: boolean;
   completePayment: () => Promise<void>;
+  cashTendered: string;
+  setCashTendered: (value: string) => void;
 };
 
 export function PaymentModal({
@@ -83,7 +90,22 @@ export function PaymentModal({
   manuallyCompleteMpesaPayment,
   isRecoveringPendingSale,
   completePayment,
+  cashTendered,
+  setCashTendered,
 }: PaymentModalProps) {
+  const receivedAmount = Number(cashTendered) || 0;
+  const changeDue = Math.max(0, receivedAmount - paymentOutstanding);
+  const shortBy = Math.max(0, paymentOutstanding - receivedAmount);
+
+  function pressKey(key: string) {
+    if (key === "Clear") {
+      setCashTendered("");
+    } else if (key === ".") {
+      if (!cashTendered.includes(".")) setCashTendered((cashTendered || "0") + ".");
+    } else if (cashTendered.length < 9) {
+      setCashTendered(cashTendered === "0" ? key : cashTendered + key);
+    }
+  }
   return (
     <div className="modal-backdrop" role="presentation">
       <section
@@ -380,14 +402,52 @@ export function PaymentModal({
           </section>
 
           <section className="numpad-panel">
-            <div className="numpad-display">{money(paymentTotal)}</div>
-            <div className="numpad">
-              {["7", "8", "9", "4", "5", "6", "1", "2", "3", "0", ".", "Clear"].map(
-                (key) => (
-                  <button key={key}>{key}</button>
-                ),
-              )}
+            <div className="numpad-display">
+              {paymentMethod === "cash" && cashTendered !== ""
+                ? money(receivedAmount)
+                : money(paymentTotal)}
             </div>
+            {paymentMethod === "cash" && (
+              <>
+                <div className="cash-tender-summary">
+                  <span>
+                    {cashTendered === "" ? "Amount received (optional)" : "Amount received"}
+                  </span>
+                  {cashTendered !== "" && shortBy > 0 ? (
+                    <strong className="is-short">Short by {money(shortBy)}</strong>
+                  ) : (
+                    <strong className={changeDue > 0 ? "is-change" : ""}>
+                      Change due {money(changeDue)}
+                    </strong>
+                  )}
+                </div>
+                <div className="quick-cash">
+                  <button type="button" onClick={() => setCashTendered(String(Math.ceil(paymentOutstanding)))}>
+                    Exact
+                  </button>
+                  {quickCashAmounts(paymentOutstanding)
+                    .filter((amount) => amount !== Math.ceil(paymentOutstanding))
+                    .map((amount) => (
+                      <button
+                        type="button"
+                        key={amount}
+                        onClick={() => setCashTendered(String(amount))}
+                      >
+                        {money(amount)}
+                      </button>
+                    ))}
+                </div>
+                <div className="numpad">
+                  {["7", "8", "9", "4", "5", "6", "1", "2", "3", "0", ".", "Clear"].map(
+                    (key) => (
+                      <button type="button" key={key} onClick={() => pressKey(key)}>
+                        {key}
+                      </button>
+                    ),
+                  )}
+                </div>
+              </>
+            )}
             <button
               className="success-button confirm-payment"
               disabled={paymentBusy || isRecoveringPendingSale}

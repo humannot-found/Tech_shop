@@ -189,6 +189,8 @@ export function PosPage({
     markAttemptOutcome,
     recordCardDecline,
     completePayment,
+    cashTendered,
+    setCashTendered,
   } = checkout;
 
   useEffect(() => {
@@ -683,6 +685,8 @@ export function PosPage({
           manuallyCompleteMpesaPayment={manuallyCompleteMpesaPayment}
           isRecoveringPendingSale={isRecoveringPendingSale}
           completePayment={completePayment}
+          cashTendered={cashTendered}
+          setCashTendered={setCashTendered}
         />
       )}
     </section>
