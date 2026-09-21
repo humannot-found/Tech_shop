@@ -431,7 +431,7 @@ matching `backend/schemas/*_schemas.py` file or in Swagger.
 | POST | `/pos/customers` | - | `CustomerCreate` | Creates customer |
 | GET | `/pos/customers/{customer_id}` | `customer_id` path | - | Gets customer |
 | GET | `/pos/sales` | `branch_id`, `page`, `page_size`, `status` query | - | Lists sales |
-| POST | `/pos/sales` | - | `SaleCreate` | Creates pending POS sale |
+| POST | `/pos/sales` | - | `SaleCreate` | Creates pending POS sale. Line `discount_amount` needs the `sales.discount` permission, or `discount_approval` (`username`/`password` of a manager or admin in the same branch), which is recorded in the audit log |
 | GET | `/pos/sales/{sale_id}` | `sale_id` path | - | Gets sale |
 | POST | `/pos/sales/{sale_id}/payments` | `sale_id` path | `SalePaymentCreate` | Adds sale payment; fully paid sale deducts stock |
 | POST | `/pos/sales/{sale_id}/mpesa/stk-push` | `sale_id` path | `MpesaStkPushCreate` | Sends customer M-Pesa STK Push and creates a pending payment |
