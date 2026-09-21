@@ -17,7 +17,12 @@ export type DiscountMode = "percent" | "amount" | "price";
 export type PaymentMethod = "cash" | "mpesa" | "card" | "split";
 export type SplitMethod = "cash" | "mpesa" | "card";
 export type RepairPaymentMethod = "cash" | "mpesa" | "card";
-export type PosWorkspaceTab = "products" | "receipts" | "repair_pickups" | "held";
+export type PosWorkspaceTab =
+  | "products"
+  | "receipts"
+  | "repair_pickups"
+  | "held"
+  | "approvals";
 export type SalesHistoryStatus = "all" | "completed" | "pending_payment" | "cancelled";
 export type SplitBalanceState = "ready" | "remaining" | "over";
 

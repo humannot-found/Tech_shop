@@ -19,6 +19,8 @@ type ReceiptsTabProps = {
   openManualMpesaRecovery: (sale: PosSale) => void;
   cancelUnpaidSale: (sale?: PosSale | null) => Promise<void>;
   openReceiptViewer: (saleId: string) => Promise<void>;
+  onRequestReturn: (sale: PosSale) => void;
+  onRequestVoid: (sale: PosSale) => void;
 };
 
 export function ReceiptsTab({
@@ -35,6 +37,8 @@ export function ReceiptsTab({
   openManualMpesaRecovery,
   cancelUnpaidSale,
   openReceiptViewer,
+  onRequestReturn,
+  onRequestVoid,
 }: ReceiptsTabProps) {
   const { user } = useAuth();
 
@@ -141,6 +145,26 @@ export function ReceiptsTab({
                 >
                   Receipt
                 </button>
+                {sale.status === "completed" && (
+                  <button
+                    type="button"
+                    disabled={historyBusy}
+                    onClick={() => onRequestReturn(sale)}
+                  >
+                    Return
+                  </button>
+                )}
+                {(sale.status === "completed" ||
+                  (sale.status === "pending_payment" &&
+                    Number(sale.paid_amount) > 0)) && (
+                  <button
+                    type="button"
+                    disabled={historyBusy}
+                    onClick={() => onRequestVoid(sale)}
+                  >
+                    Void
+                  </button>
+                )}
               </div>
             </article>
           ))}

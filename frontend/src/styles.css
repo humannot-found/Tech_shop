@@ -5448,3 +5448,111 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }
+
+/* Returns, voids and approvals */
+
+.return-modal {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+}
+
+.return-lines {
+  display: grid;
+  gap: 8px;
+}
+
+.return-line {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-soft);
+}
+
+.return-line > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.return-line span,
+.return-modal__estimate small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.return-line__fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.return-line__fields label {
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+}
+
+.return-line__fields input[type="number"] {
+  width: 76px;
+  height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.return-line__fields select {
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.return-line__restock {
+  display: flex !important;
+  align-items: center;
+  gap: 6px !important;
+}
+
+.return-modal__estimate {
+  margin: 0;
+}
+
+.pos-approvals-workspace {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.pos-approvals-header,
+.approval-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.pos-approvals-header > div,
+.approval-card > div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.approval-card > div:first-child span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.approval-card__actions {
+  display: flex;
+  gap: 6px;
+}

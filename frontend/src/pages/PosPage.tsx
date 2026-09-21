@@ -18,6 +18,7 @@ import { StatusPill } from "../components/StatusPill";
 import { ToastNotice } from "../components/ToastNotice";
 import { mockProducts } from "../data/mockProducts";
 import { useAuth } from "../state/auth";
+import { ApprovalsTab } from "./pos/ApprovalsTab";
 import { HeldOrdersTab } from "./pos/HeldOrdersTab";
 import { OrderPanel } from "./pos/OrderPanel";
 import { PaymentModal } from "./pos/PaymentModal";
@@ -26,6 +27,7 @@ import { ReceiptModal } from "./pos/ReceiptModal";
 import { ReceiptsTab } from "./pos/ReceiptsTab";
 import { RepairInvoiceModal } from "./pos/RepairInvoiceModal";
 import { RepairPickupsTab } from "./pos/RepairPickupsTab";
+import { ReturnModal } from "./pos/ReturnModal";
 import { SupervisorApprovalModal } from "./pos/SupervisorApprovalModal";
 import { TillPanels } from "./pos/TillPanels";
 import type {
@@ -35,7 +37,9 @@ import type {
 } from "./pos/types";
 import { usePosCheckout } from "./pos/usePosCheckout";
 import { useRepairDesk } from "./pos/useRepairDesk";
+import { useSaleAdjustments } from "./pos/useSaleAdjustments";
 import { useTill } from "./pos/useTill";
+import { VoidModal } from "./pos/VoidModal";
 import { productsFromApi } from "./pos/utils";
 
 export function PosPage({
@@ -88,6 +92,15 @@ export function PosPage({
     onRepairFocusHandled,
   });
   const { repairReceiptViewer, setRepairReceiptViewer } = repairDesk;
+  const adjustments = useSaleAdjustments({
+    token,
+    isPreview,
+    user,
+    tillSession,
+    knownSales: recentSales,
+    setNotice,
+    onChanged: () => void refreshRecentSales(),
+  });
 
   const checkout = usePosCheckout({
     token,
@@ -365,6 +378,7 @@ export function PosPage({
               ["receipts", "Receipts"],
               ["repair_pickups", "Repair Pickups"],
               ["held", "Held Orders"],
+              ...(adjustments.canReview ? [["approvals", "Approvals"]] : []),
             ].map(([tab, label]) => (
               <button
                 key={tab}
@@ -380,6 +394,9 @@ export function PosPage({
                 )}
                 {tab === "held" && heldOrders.length > 0 && (
                   <span>{heldOrders.length}</span>
+                )}
+                {tab === "approvals" && adjustments.pendingCount > 0 && (
+                  <span>{adjustments.pendingCount}</span>
                 )}
               </button>
             ))}
@@ -423,11 +440,17 @@ export function PosPage({
             openManualMpesaRecovery={openManualMpesaRecovery}
             cancelUnpaidSale={cancelUnpaidSale}
             openReceiptViewer={openReceiptViewer}
+            onRequestReturn={(sale) => void adjustments.openReturn(sale)}
+            onRequestVoid={adjustments.openVoid}
           />
         )}
 
         {activeWorkspaceTab === "repair_pickups" && (
           <RepairPickupsTab desk={repairDesk} tillSession={tillSession} />
+        )}
+
+        {activeWorkspaceTab === "approvals" && adjustments.canReview && (
+          <ApprovalsTab adjustments={adjustments} />
         )}
 
         {activeWorkspaceTab === "held" && (
@@ -438,6 +461,25 @@ export function PosPage({
           />
         )}
       </section>
+
+      {adjustments.returnSale && (
+        <ReturnModal
+          sale={adjustments.returnSale}
+          history={adjustments.returnHistory}
+          busy={adjustments.adjustBusy}
+          onSubmit={adjustments.submitReturn}
+          onClose={adjustments.closeReturn}
+        />
+      )}
+
+      {adjustments.voidSale && (
+        <VoidModal
+          sale={adjustments.voidSale}
+          busy={adjustments.adjustBusy}
+          onSubmit={adjustments.submitVoid}
+          onClose={adjustments.closeVoid}
+        />
+      )}
 
       {approvalOpen && (
         <SupervisorApprovalModal

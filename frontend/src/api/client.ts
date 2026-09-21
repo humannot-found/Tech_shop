@@ -45,6 +45,9 @@ import type {
   ProductUpdatePayload,
   PosSale,
   PosSaleCreatePayload,
+  SaleReturn,
+  SaleReturnPayload,
+  SaleVoidPayload,
   ProductVariant,
   ProductVariantCreatePayload,
   ProductVariantUpdatePayload,
@@ -451,6 +454,75 @@ export function listPosSales(
       status: options?.status,
     },
   });
+}
+
+export function requestSaleReturn(
+  token: string,
+  saleId: string,
+  body: SaleReturnPayload,
+) {
+  return apiRequest<SaleReturn>(`/pos/sales/${saleId}/returns`, {
+    token,
+    method: "POST",
+    body,
+  });
+}
+
+export function listSaleReturns(token: string, saleId: string) {
+  return apiRequest<SaleReturn[]>(`/pos/sales/${saleId}/returns`, { token });
+}
+
+export function listBranchReturns(
+  token: string,
+  branchId: string,
+  status?: string,
+) {
+  return apiRequest<SaleReturn[]>("/pos/returns", {
+    token,
+    query: { branch_id: branchId, status },
+  });
+}
+
+export function decideSaleReturn(
+  token: string,
+  returnId: string,
+  body: ApprovalDecisionPayload,
+) {
+  return apiRequest<SaleReturn>(`/pos/returns/${returnId}/decision`, {
+    token,
+    method: "POST",
+    body,
+  });
+}
+
+export function requestSaleVoid(
+  token: string,
+  saleId: string,
+  body: SaleVoidPayload,
+) {
+  return apiRequest<ApprovalRequest>(`/pos/sales/${saleId}/void-requests`, {
+    token,
+    method: "POST",
+    body,
+  });
+}
+
+export function listVoidRequests(token: string, branchId: string) {
+  return apiRequest<ApprovalRequest[]>("/pos/sales/void-requests", {
+    token,
+    query: { branch_id: branchId },
+  });
+}
+
+export function decideSaleVoid(
+  token: string,
+  requestId: string,
+  body: ApprovalDecisionPayload,
+) {
+  return apiRequest<ApprovalRequest>(
+    `/pos/sales/void-requests/${requestId}/decision`,
+    { token, method: "POST", body },
+  );
 }
 
 export function listOnlineOrders(

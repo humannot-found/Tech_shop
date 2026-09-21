@@ -635,6 +635,42 @@ export type ApprovalRequest = ModelResponse & {
   requested_changes: Record<string, unknown> | null;
 };
 
+export type SaleReturnItem = ModelResponse & {
+  return_id: UUID;
+  sale_item_id: UUID;
+  quantity: number;
+  condition: string;
+  restock: boolean;
+};
+
+export type SaleReturn = ModelResponse & {
+  sale_id: UUID;
+  till_session_id: UUID | null;
+  return_number: string;
+  requested_by_id: UUID;
+  approved_by_id: UUID | null;
+  status: string;
+  reason: string;
+  refund_amount: string;
+  items: SaleReturnItem[];
+};
+
+export type SaleReturnPayload = {
+  till_session_id: UUID;
+  reason: string;
+  items: Array<{
+    sale_item_id: UUID;
+    quantity: number;
+    condition: string;
+    restock: boolean;
+  }>;
+};
+
+export type SaleVoidPayload = {
+  till_session_id: UUID;
+  reason: string;
+};
+
 export type StockAdjustmentPayload = {
   branch_id: UUID;
   variant_id: UUID;

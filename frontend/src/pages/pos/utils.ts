@@ -128,3 +128,23 @@ export function lineDiscountFromInput(
   }
   return { amount: Math.round(amount * 100) / 100 };
 }
+
+export function canReviewAdjustments(user: CurrentUser | null) {
+  if (!user) return false;
+  return (
+    ["admin", "owner"].includes(user.role_code.toLowerCase()) ||
+    user.permissions.includes("*") ||
+    user.permissions.includes("returns.approve") ||
+    user.permissions.includes("sales.void")
+  );
+}
+
+export const restockableConditions = ["new", "good", "sealed"];
+
+export const returnConditions = [
+  { value: "good", label: "Good" },
+  { value: "new", label: "New / unopened" },
+  { value: "sealed", label: "Sealed" },
+  { value: "damaged", label: "Damaged" },
+  { value: "faulty", label: "Faulty" },
+];
