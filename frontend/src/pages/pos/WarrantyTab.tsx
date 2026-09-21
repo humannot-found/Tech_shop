@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 
-import { ApiError, lookupWarranty } from "../../api/client";
+import { searchWarranties } from "../../api/client";
 import type { StatusTone, WarrantyLookup } from "../../api/types";
 import { StatusPill } from "../../components/StatusPill";
 import { useAuth } from "../../state/auth";
@@ -30,14 +30,14 @@ export function WarrantyTab({ onOpenReceipt }: WarrantyTabProps) {
   const { token, isPreview } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<WarrantyLookup | null>(null);
+  const [results, setResults] = useState<WarrantyLookup[] | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const needle = identifier.trim();
     if (needle.length < 3) {
-      setMessage("Enter at least 3 characters of the IMEI or serial number.");
+      setMessage("Enter at least 3 characters to search.");
       return;
     }
     if (!token || isPreview) {
@@ -48,15 +48,17 @@ export function WarrantyTab({ onOpenReceipt }: WarrantyTabProps) {
     setBusy(true);
     setMessage(null);
     try {
-      setResult(await lookupWarranty(token, needle));
+      const found = await searchWarranties(token, needle);
+      setResults(found);
+      if (!found.length) {
+        setMessage(
+          "No warranty found. Check the spelling, or the item may not have been sold with warranty at this branch.",
+        );
+      }
     } catch (error) {
-      setResult(null);
+      setResults(null);
       setMessage(
-        error instanceof ApiError && error.status === 404
-          ? "No warranty found for that IMEI or serial number. It may not have been sold with warranty at this shop."
-          : error instanceof Error
-            ? error.message
-            : "Could not check the warranty.",
+        error instanceof Error ? error.message : "Could not check the warranty.",
       );
     } finally {
       setBusy(false);
@@ -67,38 +69,38 @@ export function WarrantyTab({ onOpenReceipt }: WarrantyTabProps) {
     <section className="pos-warranty-workspace">
       <form className="warranty-search" onSubmit={handleSubmit}>
         <label>
-          <span>IMEI or serial number</span>
+          <span>IMEI, serial number, invoice number or customer phone</span>
           <input
             autoFocus
             value={identifier}
             onChange={(event) => setIdentifier(event.target.value)}
-            placeholder="Scan or type the device IMEI / serial"
+            placeholder="Scan an IMEI, or type an invoice number or phone"
           />
         </label>
         <button className="primary-button" disabled={busy}>
-          {busy ? "Checking..." : "Check warranty"}
+          {busy ? "Searching..." : "Search"}
         </button>
       </form>
 
       {message && <div className="warranty-message">{message}</div>}
 
-      {!result && !message && (
+      {!results && !message && (
         <div className="pos-empty-state">
-          <strong>Check a device warranty</strong>
+          <strong>Check a warranty</strong>
           <span>
-            Enter the IMEI or serial number to see whether the device is still
-            covered and which sale it came from.
+            Search by IMEI, serial number, invoice number or the customer's
+            phone to see what is still covered and which sale it came from.
           </span>
         </div>
       )}
 
-      {result && (
-        <article className="warranty-card">
+      {results?.map((result) => (
+        <article className="warranty-card" key={result.id}>
           <header>
             <div>
               <p className="eyebrow">Warranty</p>
               <h2>{result.description}</h2>
-              <span>{result.unit_identifier ?? "No IMEI / serial on record"}</span>
+              <span>{result.unit_identifier ?? "No IMEI / serial (bulk item)"}</span>
             </div>
             <StatusPill tone={coverageTone(result.coverage)}>
               {coverageLabel(result)}
@@ -138,7 +140,7 @@ export function WarrantyTab({ onOpenReceipt }: WarrantyTabProps) {
             </button>
           </div>
         </article>
-      )}
+      ))}
     </section>
   );
 }

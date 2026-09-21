@@ -457,10 +457,10 @@ export function listPosSales(
   });
 }
 
-export function lookupWarranty(token: string, identifier: string) {
-  return apiRequest<WarrantyLookup>("/pos/warranties/lookup", {
+export function searchWarranties(token: string, query: string) {
+  return apiRequest<WarrantyLookup[]>("/pos/warranties/search", {
     token,
-    query: { identifier },
+    query: { q: query },
   });
 }
 
