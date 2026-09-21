@@ -31,6 +31,7 @@ import type {
   StockTransfer,
 } from "../api/types";
 import { StatusPill } from "../components/StatusPill";
+import { ReorderLevelsModal } from "./inventory/ReorderLevelsModal";
 import { ToastNotice } from "../components/ToastNotice";
 import {
   demoAdjustmentRequests,
@@ -140,12 +141,20 @@ function countVarianceSummary(count?: StockCount) {
 
 export function InventoryPage() {
   const { token, isPreview, user } = useAuth();
+  const canEditReorderLevels = Boolean(
+    user &&
+      (["admin", "owner"].includes(user.role_code.toLowerCase()) ||
+        user.permissions.includes("*") ||
+        user.permissions.includes("inventory.adjust")),
+  );
   const [query, setQuery] = useState("");
   const [balanceFilter, setBalanceFilter] = useState<BalanceFilter>("all");
   const [serializedStatus, setSerializedStatus] =
     useState<SerializedStatusFilter>("all");
   const [movementScope, setMovementScope] = useState<MovementScope>("selected");
   const [branches, setBranches] = useState<Branch[]>(demoBranches);
+  const [reorderOpen, setReorderOpen] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [selectedBranchId, setSelectedBranchId] = useState(
     user?.branch_id ?? demoBranches[0]?.id ?? "",
   );
@@ -430,6 +439,7 @@ export function InventoryPage() {
     selectedStockBalance?.variant_id,
     serializedStatus,
     token,
+    reloadKey,
   ]);
 
   useEffect(() => {
@@ -1673,7 +1683,14 @@ export function InventoryPage() {
             <p className="eyebrow">Branch stock</p>
             <h2>Products in branch stock</h2>
           </div>
-          <StatusPill tone="neutral">{integer(visibleBalances.length)} shown</StatusPill>
+          <div className="table-actions">
+            {token && !isPreview && canEditReorderLevels && (
+              <button type="button" onClick={() => setReorderOpen(true)}>
+                Reorder levels
+              </button>
+            )}
+            <StatusPill tone="neutral">{integer(visibleBalances.length)} shown</StatusPill>
+          </div>
         </header>
         <table className="data-table">
           <thead>
@@ -1953,6 +1970,18 @@ export function InventoryPage() {
           </table>
         </section>
       </div>
+      {reorderOpen && token && selectedBranchId && (
+        <ReorderLevelsModal
+          token={token}
+          branchId={selectedBranchId}
+          onClose={() => setReorderOpen(false)}
+          onSaved={(message) => {
+            setReorderOpen(false);
+            setNotice(message);
+            setReloadKey((key) => key + 1);
+          }}
+        />
+      )}
     </section>
   );
 }

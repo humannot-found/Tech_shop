@@ -745,6 +745,16 @@ export type TillCashMovementPayload = {
   reason: string;
 };
 
+/** A stock row; stock_balance_id is null for an item the branch never received. */
+export type ReorderRow = Omit<InventoryBalance, "stock_balance_id"> & {
+  stock_balance_id: UUID | null;
+};
+
+export type ReorderLevelsPayload = {
+  branch_id: UUID;
+  items: Array<{ variant_id: UUID; reorder_level: number }>;
+};
+
 export type StockAdjustmentPayload = {
   branch_id: UUID;
   variant_id: UUID;

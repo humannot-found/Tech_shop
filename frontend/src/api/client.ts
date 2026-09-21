@@ -49,6 +49,8 @@ import type {
   SaleReturnPayload,
   SaleVoidPayload,
   WarrantyLookup,
+  ReorderLevelsPayload,
+  ReorderRow,
   ShiftReport,
   TillCashMovement,
   TillCashMovementPayload,
@@ -833,6 +835,27 @@ export function listInventoryBalances(
       page: 1,
       page_size: options?.pageSize ?? 75,
     },
+  });
+}
+
+export function listReorderRows(token: string, branchId: string, query = "") {
+  return apiRequest<Page<ReorderRow>>("/inventory/balances", {
+    token,
+    query: {
+      branch_id: branchId,
+      query: query || undefined,
+      include_unstocked: true,
+      page: 1,
+      page_size: 200,
+    },
+  });
+}
+
+export function saveReorderLevels(token: string, body: ReorderLevelsPayload) {
+  return apiRequest<ReorderRow[]>("/inventory/reorder-levels", {
+    token,
+    method: "PUT",
+    body,
   });
 }
 

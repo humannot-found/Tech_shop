@@ -5812,3 +5812,77 @@ button:disabled {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* Reorder levels dialog */
+
+.reorder-modal {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+}
+
+.reorder-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.reorder-toolbar > input {
+  flex: 1 1 180px;
+  height: 36px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.reorder-toolbar__filters,
+.reorder-toolbar__bulk {
+  display: flex;
+  gap: 6px;
+}
+
+.reorder-toolbar button {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  font-weight: 700;
+}
+
+.reorder-toolbar button.is-active {
+  color: #fff;
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.reorder-toolbar__bulk input {
+  width: 80px;
+  height: 36px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.reorder-table-wrap {
+  max-height: 46dvh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.reorder-table-wrap input {
+  width: 90px;
+  height: 30px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.reorder-table-wrap input.is-invalid {
+  border-color: var(--danger);
+}
+
+.reorder-note {
+  color: var(--muted);
+}
