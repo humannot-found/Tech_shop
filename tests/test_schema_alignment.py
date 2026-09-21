@@ -28,6 +28,7 @@ from backend.models.sales import (
     SaleReturn,
     SaleReturnItem,
     Till,
+    TillCashMovement,
     TillSession,
 )
 from backend.models.stocktake import StockCount, StockCountItem
@@ -71,6 +72,7 @@ from backend.schemas.sales_schemas import (
     SaleResponse,
     SaleReturnItemResponse,
     SaleReturnResponse,
+    TillCashMovementResponse,
     TillResponse,
     TillSessionResponse,
 )
@@ -116,6 +118,7 @@ PAIRS = [
     (Role, RoleResponse, {"permissions"}),
     (Till, TillResponse, set()),
     (TillSession, TillSessionResponse, set()),
+    (TillCashMovement, TillCashMovementResponse, set()),
     (Sale, SaleResponse, {"items"}),
     (SaleItem, SaleItemResponse, set()),
     (SaleReturn, SaleReturnResponse, {"items"}),

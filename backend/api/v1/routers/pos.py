@@ -25,7 +25,10 @@ from backend.schemas.sales_schemas import (
     SaleReturnCreate,
     SaleReturnResponse,
     SaleVoidRequest,
+    TillCashMovementCreate,
+    TillCashMovementResponse,
     TillCreate,
+    TillDrawerSummary,
     TillResponse,
     TillSessionClose,
     TillSessionOpen,
@@ -114,6 +117,41 @@ def open_till_session(
     item = till_service.open_session(db, principal, payload)
     db.commit()
     return TillSessionResponse.model_validate(item)
+
+
+@router.get(
+    "/till-sessions/{session_id}/drawer", response_model=TillDrawerSummary
+)
+def till_drawer_summary(
+    session_id: UUID, principal: SalesPrincipal, db: DatabaseSession
+) -> TillDrawerSummary:
+    return till_service.drawer_summary(db, principal, session_id)
+
+
+@router.get(
+    "/till-sessions/{session_id}/cash-movements",
+    response_model=list[TillCashMovementResponse],
+)
+def list_cash_movements(
+    session_id: UUID, principal: SalesPrincipal, db: DatabaseSession
+) -> list[TillCashMovementResponse]:
+    return till_service.list_cash_movements(db, principal, session_id)
+
+
+@router.post(
+    "/till-sessions/{session_id}/cash-movements",
+    response_model=TillCashMovementResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def record_cash_movement(
+    session_id: UUID,
+    payload: TillCashMovementCreate,
+    principal: SalesPrincipal,
+    db: DatabaseSession,
+) -> TillCashMovementResponse:
+    item = till_service.record_cash_movement(db, principal, session_id, payload)
+    db.commit()
+    return item
 
 
 @router.post("/till-sessions/{session_id}/close", response_model=TillSessionResponse)

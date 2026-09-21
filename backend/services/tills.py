@@ -2,20 +2,24 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.core.permissions import ADMIN, BRANCH_MANAGER
 from backend.models.enums import (
+    CashMovementKind,
     PaymentDirection,
     PaymentMethod,
     PaymentStatus,
     TillSessionStatus,
 )
 from backend.models.payments import Payment
-from backend.models.sales import Till, TillSession
+from backend.models.sales import Till, TillCashMovement, TillSession
 from backend.schemas.sales_schemas import (
+    TillCashMovementCreate,
+    TillCashMovementResponse,
     TillCreate,
+    TillDrawerSummary,
     TillSessionClose,
     TillSessionOpen,
     TillUpdate,
@@ -189,6 +193,150 @@ def open_session(
     return session
 
 
+def _cash_totals(db: Session, session: TillSession) -> dict[str, Decimal]:
+    zero = Decimal("0.00")
+    cash_sales = db.scalar(
+        select(func.coalesce(func.sum(Payment.amount), zero)).where(
+            Payment.till_session_id == session.id,
+            Payment.method == PaymentMethod.CASH,
+            Payment.direction == PaymentDirection.INCOMING,
+            Payment.status == PaymentStatus.COMPLETED,
+            Payment.is_deleted.is_(False),
+        )
+    ) or zero
+    cash_refunds = db.scalar(
+        select(func.coalesce(func.sum(Payment.amount), zero)).where(
+            Payment.till_session_id == session.id,
+            Payment.method == PaymentMethod.CASH,
+            Payment.direction == PaymentDirection.OUTGOING,
+            Payment.status == PaymentStatus.COMPLETED,
+            Payment.is_deleted.is_(False),
+        )
+    ) or zero
+    movements = dict(
+        db.execute(
+            select(
+                TillCashMovement.kind,
+                func.coalesce(func.sum(TillCashMovement.amount), zero),
+            )
+            .where(
+                TillCashMovement.till_session_id == session.id,
+                TillCashMovement.is_deleted.is_(False),
+            )
+            .group_by(TillCashMovement.kind)
+        ).all()
+    )
+    cash_in = movements.get(CashMovementKind.CASH_IN, zero)
+    paid_out = movements.get(CashMovementKind.PAID_OUT, zero)
+    cash_drop = movements.get(CashMovementKind.CASH_DROP, zero)
+    return {
+        "cash_sales": cash_sales,
+        "cash_refunds": cash_refunds,
+        "cash_in": cash_in,
+        "paid_out": paid_out,
+        "cash_drop": cash_drop,
+        "expected_cash": session.opening_float
+        + cash_sales
+        - cash_refunds
+        + cash_in
+        - paid_out
+        - cash_drop,
+    }
+
+
+def _get_session_for_view(
+    db: Session, principal: AuthPrincipal, session_id: UUID
+) -> TillSession:
+    session = db.scalar(
+        select(TillSession).where(
+            TillSession.id == session_id, TillSession.is_deleted.is_(False)
+        )
+    )
+    if session is None:
+        raise NotFoundError("till session not found")
+    if session.cashier_id == principal.user_id:
+        enforce_permission(principal, "sales.process")
+        return session
+    enforce_permission(principal, "tills.manage")
+    till = db.get(Till, session.till_id)
+    if till is None:
+        raise NotFoundError("till not found")
+    enforce_branch_scope(principal, till.branch_id)
+    return session
+
+
+def drawer_summary(
+    db: Session, principal: AuthPrincipal, session_id: UUID
+) -> TillDrawerSummary:
+    session = _get_session_for_view(db, principal, session_id)
+    totals = _cash_totals(db, session)
+    return TillDrawerSummary(
+        till_session_id=session.id, opening_float=session.opening_float, **totals
+    )
+
+
+def list_cash_movements(
+    db: Session, principal: AuthPrincipal, session_id: UUID
+) -> list[TillCashMovementResponse]:
+    session = _get_session_for_view(db, principal, session_id)
+    rows = db.scalars(
+        select(TillCashMovement)
+        .where(
+            TillCashMovement.till_session_id == session.id,
+            TillCashMovement.is_deleted.is_(False),
+        )
+        .order_by(TillCashMovement.created_at.desc())
+    ).all()
+    return [TillCashMovementResponse.model_validate(row) for row in rows]
+
+
+def record_cash_movement(
+    db: Session,
+    principal: AuthPrincipal,
+    session_id: UUID,
+    payload: TillCashMovementCreate,
+) -> TillCashMovementResponse:
+    enforce_permission(principal, "sales.process")
+    session = db.scalar(
+        select(TillSession)
+        .where(TillSession.id == session_id, TillSession.is_deleted.is_(False))
+        .with_for_update()
+    )
+    if session is None:
+        raise NotFoundError("till session not found")
+    if session.cashier_id != principal.user_id:
+        raise AuthorizationError("cashiers can only record cash for their own till")
+    if session.status != TillSessionStatus.OPEN:
+        raise ConflictError("till session is already closed")
+    amount = payload.amount.quantize(Decimal("0.01"))
+    if payload.kind != CashMovementKind.CASH_IN:
+        in_drawer = _cash_totals(db, session)["expected_cash"]
+        if amount > in_drawer:
+            raise ValidationError(
+                f"only {in_drawer} is in the till, so {amount} cannot be taken out"
+            )
+    movement = TillCashMovement(
+        till_session_id=session.id,
+        kind=payload.kind,
+        amount=amount,
+        reason=payload.reason.strip(),
+        created_by_id=principal.user_id,
+    )
+    db.add(movement)
+    db.flush()
+    till = db.get(Till, session.till_id)
+    record_audit(
+        db,
+        actor_id=principal.user_id,
+        branch_id=till.branch_id if till else principal.branch_id,
+        action=f"till.{payload.kind.value}",
+        resource_type="till_session",
+        resource_id=session.id,
+        after={"amount": str(amount), "reason": movement.reason},
+    )
+    return TillCashMovementResponse.model_validate(movement)
+
+
 def close_session(
     db: Session,
     principal: AuthPrincipal,
@@ -207,28 +355,7 @@ def close_session(
         raise AuthorizationError("cashiers can only close their own till session")
     if session.status != TillSessionStatus.OPEN:
         raise ConflictError("till session is already closed")
-    cash_net = db.scalar(
-        select(
-            func.coalesce(
-                func.sum(
-                    case(
-                        (
-                            Payment.direction == PaymentDirection.INCOMING,
-                            Payment.amount,
-                        ),
-                        else_=-Payment.amount,
-                    )
-                ),
-                Decimal("0.00"),
-            )
-        ).where(
-            Payment.till_session_id == session.id,
-            Payment.method == PaymentMethod.CASH,
-            Payment.status == PaymentStatus.COMPLETED,
-            Payment.is_deleted.is_(False),
-        )
-    ) or Decimal("0.00")
-    session.expected_cash = session.opening_float + cash_net
+    session.expected_cash = _cash_totals(db, session)["expected_cash"]
     session.closing_cash = payload.closing_cash
     session.status = TillSessionStatus.CLOSED
     session.closed_at = datetime.now(timezone.utc)

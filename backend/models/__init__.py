@@ -28,6 +28,7 @@ from backend.models.sales import (
     SaleReturn,
     SaleReturnItem,
     Till,
+    TillCashMovement,
     TillSession,
 )
 from backend.models.suppliers import Supplier
@@ -74,6 +75,7 @@ __all__ = [
     "StockTransferItem",
     "Supplier",
     "Till",
+    "TillCashMovement",
     "TillSession",
     "User",
     "Warranty",

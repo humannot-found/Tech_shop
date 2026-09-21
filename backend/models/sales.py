@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.models.base import BaseModel
 from backend.models.enums import (
+    CashMovementKind,
     FulfillmentStatus,
     SaleChannel,
     SaleStatus,
@@ -53,6 +54,31 @@ class TillSession(BaseModel):
     )
     expected_cash: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     closing_cash: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+
+
+
+class TillCashMovement(BaseModel):
+    """Cash put into or taken out of a till drawer outside of sales and refunds."""
+
+    __tablename__ = "till_cash_movements"
+
+    till_session_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("till_sessions.id"), nullable=False, index=True
+    )
+    kind: Mapped[CashMovementKind] = mapped_column(
+        Enum(
+            CashMovementKind,
+            values_callable=enum_values,
+            native_enum=False,
+            name="cash_movement_kind",
+        ),
+        nullable=False,
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    reason: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_by_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
 
 
 class Sale(BaseModel):

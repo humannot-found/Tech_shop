@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import Field
 
 from backend.models.enums import (
+    CashMovementKind,
     FulfillmentStatus,
     PaymentMethod,
     SaleChannel,
@@ -35,6 +36,31 @@ class TillResponse(ModelResponse):
 class TillSessionOpen(BaseSchema):
     till_id: UUID
     opening_float: Decimal = Field(default=Decimal("0.00"), ge=0)
+
+
+class TillCashMovementCreate(BaseSchema):
+    kind: CashMovementKind
+    amount: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
+    reason: str = Field(min_length=3, max_length=200)
+
+
+class TillCashMovementResponse(ModelResponse):
+    till_session_id: UUID
+    kind: CashMovementKind
+    amount: Decimal
+    reason: str
+    created_by_id: UUID
+
+
+class TillDrawerSummary(BaseSchema):
+    till_session_id: UUID
+    opening_float: Decimal
+    cash_sales: Decimal
+    cash_refunds: Decimal
+    cash_in: Decimal
+    paid_out: Decimal
+    cash_drop: Decimal
+    expected_cash: Decimal
 
 
 class TillSessionClose(BaseSchema):

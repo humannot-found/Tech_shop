@@ -134,6 +134,12 @@ class ApprovalStatus(StringEnum):
     CANCELLED = "cancelled"
 
 
+class CashMovementKind(StringEnum):
+    CASH_IN = "cash_in"
+    PAID_OUT = "paid_out"
+    CASH_DROP = "cash_drop"
+
+
 class TillSessionStatus(StringEnum):
     OPEN = "open"
     CLOSED = "closed"
