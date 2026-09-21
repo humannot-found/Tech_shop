@@ -314,7 +314,7 @@ export function OrderPanel({
           <button className="danger-button" onClick={clearCurrentCart}>
             Clear Cart
           </button>
-          <button onClick={holdCurrentOrder} title="Hold order (F8)">
+          <button onClick={holdCurrentOrder} title="Hold order (Alt+H)">
             Hold
           </button>
           <button className="success-button" onClick={openPayment}>

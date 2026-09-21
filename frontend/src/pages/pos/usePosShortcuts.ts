@@ -9,16 +9,21 @@ export type PosShortcutHandlers = {
   closeTopDialog: () => boolean;
 };
 
+/**
+ * Alt + letter, not the F-keys: laptop keyboards give the F-row other jobs
+ * (volume, brightness) unless Fn is held. Keys are matched by physical key
+ * position, so they work on any keyboard layout.
+ */
 export const posShortcutHints = [
-  { key: "F2", label: "Search / scan" },
-  { key: "F4", label: "Payment" },
-  { key: "F8", label: "Hold order" },
-  { key: "F9", label: "New order" },
+  { key: "Alt+S", label: "Search / scan" },
+  { key: "Alt+P", label: "Payment" },
+  { key: "Alt+H", label: "Hold order" },
+  { key: "Alt+N", label: "New order" },
   { key: "Esc", label: "Close dialog" },
 ];
 
 /**
- * Cashier keyboard shortcuts. F-keys work while typing in a field, so a cashier
+ * Cashier keyboard shortcuts. They work while typing in a field, so a cashier
  * can scan an item and go straight to payment without touching the mouse.
  */
 export function usePosShortcuts(handlers: PosShortcutHandlers) {
@@ -27,23 +32,30 @@ export function usePosShortcuts(handlers: PosShortcutHandlers) {
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.ctrlKey || event.altKey || event.metaKey || event.repeat) return;
+      if (event.repeat) return;
 
-      const actions: Record<string, () => void> = {
-        F2: () => latest.current.focusSearch(),
-        F4: () => latest.current.openPayment(),
-        F8: () => latest.current.holdOrder(),
-        F9: () => latest.current.newOrder(),
-      };
-
-      const action = actions[event.key];
-      if (action) {
-        event.preventDefault();
-        action();
+      if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+        const actions: Record<string, () => void> = {
+          KeyS: () => latest.current.focusSearch(),
+          KeyP: () => latest.current.openPayment(),
+          KeyH: () => latest.current.holdOrder(),
+          KeyN: () => latest.current.newOrder(),
+        };
+        const action = actions[event.code];
+        if (action) {
+          event.preventDefault();
+          action();
+        }
         return;
       }
 
-      if (event.key === "Escape" && latest.current.closeTopDialog()) {
+      if (
+        event.key === "Escape" &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        latest.current.closeTopDialog()
+      ) {
         event.preventDefault();
       }
     }
