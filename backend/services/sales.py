@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from backend.core.permissions import CASHIER
+from backend.core.permissions import ADMIN, CASHIER
 from backend.models.branch import Branch
 from backend.models.customer import Customer
 from backend.models.enums import (
@@ -33,6 +33,7 @@ from backend.schemas.payments_schemas import (
     SalePaymentCreate,
 )
 from backend.schemas.sales_schemas import (
+    DiscountApproval,
     POSSaleItemResponse,
     POSSaleResponse,
     ReceiptPaymentLine,
@@ -42,7 +43,11 @@ from backend.schemas.sales_schemas import (
 from backend.schemas.warranty_schemas import WarrantyResponse
 from backend.services import inventory
 from backend.services.audit import record_audit
-from backend.services.auth import AuthPrincipal
+from backend.services.auth import (
+    AuthenticationError,
+    AuthPrincipal,
+    principal_for_credentials,
+)
 from backend.services.authorization import (
     AuthorizationError,
     enforce_branch_scope,
@@ -174,6 +179,33 @@ def _get_sale_payment(
         raise ConflictError("payment is not linked to a sale")
     sale = get_sale_model(db, principal, payment.sale_id, lock=lock)
     return sale, payment
+
+
+def discount_requires_approval(
+    principal: AuthPrincipal, discount_total: Decimal
+) -> bool:
+    return (
+        discount_total > 0
+        and principal.role_code != ADMIN
+        and "sales.discount" not in principal.permissions
+    )
+
+
+def _verify_discount_approver(
+    db: Session, approval: DiscountApproval | None, branch_id: UUID
+) -> AuthPrincipal:
+    if approval is None:
+        raise AuthorizationError("discounts need supervisor approval")
+    try:
+        approver = principal_for_credentials(
+            db, approval.username, approval.password
+        )
+    except AuthenticationError:
+        raise AuthorizationError("supervisor credentials were not accepted") from None
+    if approver.role_code != ADMIN and "sales.discount" not in approver.permissions:
+        raise AuthorizationError("this account cannot approve discounts")
+    enforce_branch_scope(approver, branch_id)
+    return approver
 
 
 def create_sale(
@@ -329,6 +361,12 @@ def create_sale(
     if total <= 0:
         raise ValidationError("sale total must be greater than zero")
 
+    discount_approver = None
+    if discount_requires_approval(principal, discount_total):
+        discount_approver = _verify_discount_approver(
+            db, payload.discount_approval, payload.branch_id
+        )
+
     sale = Sale(
         branch_id=payload.branch_id,
         customer_id=payload.customer_id,
@@ -357,7 +395,14 @@ def create_sale(
         action="sale.created",
         resource_type="sale",
         resource_id=sale.id,
-        after={"invoice_number": sale.invoice_number, "total": str(sale.total_amount)},
+        after={
+            "invoice_number": sale.invoice_number,
+            "total": str(sale.total_amount),
+            "discount": str(sale.discount_amount),
+            "discount_approved_by": (
+                str(discount_approver.user_id) if discount_approver else None
+            ),
+        },
     )
     return sale_response(db, sale)
 

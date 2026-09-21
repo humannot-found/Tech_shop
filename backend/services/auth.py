@@ -105,7 +105,7 @@ def issue_token_pair(principal: AuthPrincipal) -> TokenPair:
     )
 
 
-def authenticate(db: Session, identifier: str, password: str) -> TokenPair:
+def verify_credentials(db: Session, identifier: str, password: str) -> User:
     normalized = identifier.strip().lower()
     user = db.scalar(
         select(User).where(
@@ -119,7 +119,19 @@ def authenticate(db: Session, identifier: str, password: str) -> TokenPair:
     )
     if user is None or not verify_password(password, user.password_hash):
         raise AuthenticationError("invalid username or password")
-    return issue_token_pair(_principal_for_user(db, user))
+    return user
+
+
+def authenticate(db: Session, identifier: str, password: str) -> TokenPair:
+    return issue_token_pair(
+        _principal_for_user(db, verify_credentials(db, identifier, password))
+    )
+
+
+def principal_for_credentials(
+    db: Session, identifier: str, password: str
+) -> AuthPrincipal:
+    return _principal_for_user(db, verify_credentials(db, identifier, password))
 
 
 def principal_from_token(

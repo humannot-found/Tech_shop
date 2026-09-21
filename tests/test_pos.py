@@ -124,3 +124,27 @@ def test_branch_manager_permission_set_includes_till_management() -> None:
 
     definition = next(item for item in ROLE_DEFINITIONS if item.code == BRANCH_MANAGER)
     assert "tills.manage" in definition.permissions
+
+
+def test_cashier_discounts_need_supervisor_approval() -> None:
+    cashier = principal(CASHIER, {"sales.process"})
+    assert sale_service.discount_requires_approval(cashier, Decimal("50.00"))
+    assert not sale_service.discount_requires_approval(cashier, Decimal("0.00"))
+
+
+def test_discount_permission_holders_do_not_need_approval() -> None:
+    manager = principal(BRANCH_MANAGER, {"sales.process", "sales.discount"})
+    assert not sale_service.discount_requires_approval(manager, Decimal("50.00"))
+
+
+def test_missing_supervisor_approval_is_rejected() -> None:
+    with pytest.raises(AuthorizationError):
+        sale_service._verify_discount_approver(None, None, uuid4())  # type: ignore[arg-type]
+
+
+def test_branch_manager_can_discount_but_cashier_cannot() -> None:
+    from backend.core.permissions import ROLE_DEFINITIONS
+
+    by_code = {item.code: item for item in ROLE_DEFINITIONS}
+    assert "sales.discount" in by_code[BRANCH_MANAGER].permissions
+    assert "sales.discount" not in by_code[CASHIER].permissions

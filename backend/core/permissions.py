@@ -43,6 +43,10 @@ PERMISSIONS = (
     permission("purchases.receive", "Receive stock against purchase orders"),
     permission("sales.process", "Process point-of-sale transactions"),
     permission("sales.void", "Approve or perform sale voids"),
+    permission(
+        "sales.discount",
+        "Give line discounts at the till and approve cashier discounts",
+    ),
     permission("returns.approve", "Approve returns and refunds"),
     permission("tills.manage", "Create and configure branch tills"),
     permission("repairs.view", "View repair tickets within the permitted scope"),
@@ -74,6 +78,7 @@ BRANCH_MANAGER_PERMISSIONS = frozenset(
         "purchases.receive",
         "sales.process",
         "sales.void",
+        "sales.discount",
         "returns.approve",
         "tills.manage",
         "repairs.view",

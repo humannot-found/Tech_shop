@@ -59,12 +59,18 @@ class SaleItemCreate(BaseSchema):
     discount_amount: Decimal = Field(default=Decimal("0.00"), ge=0)
 
 
+class DiscountApproval(BaseSchema):
+    username: str = Field(min_length=1, max_length=254)
+    password: str = Field(min_length=1, max_length=256)
+
+
 class SaleCreate(BaseSchema):
     branch_id: UUID
     customer_id: UUID | None = None
     till_session_id: UUID | None = None
     channel: SaleChannel
     notes: str | None = Field(default=None, max_length=500)
+    discount_approval: DiscountApproval | None = None
     items: list[SaleItemCreate] = Field(min_length=1)
 
 
