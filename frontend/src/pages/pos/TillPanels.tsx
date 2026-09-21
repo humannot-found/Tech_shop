@@ -28,6 +28,8 @@ export function TillPanels({
     handleCloseTill,
     tillSession,
     setCashMovementOpen,
+    openShiftReport,
+    shiftReportBusy,
   } = till;
 
   return (
@@ -87,6 +89,13 @@ export function TillPanels({
                 Cash in / out
               </button>
               <button
+                type="button"
+                disabled={shiftReportBusy}
+                onClick={() => void openShiftReport(tillSession.id)}
+              >
+                Shift report
+              </button>
+              <button
                 className="secondary-button"
                 onClick={() => {
                   setCloseTillOpen(true);
@@ -135,6 +144,13 @@ export function TillPanels({
               {money(Number(lastClosedTill.closing_cash ?? 0))}
             </span>
           </div>
+          <button
+            type="button"
+            disabled={shiftReportBusy}
+            onClick={() => void openShiftReport(lastClosedTill.id)}
+          >
+            Shift report
+          </button>
           <StatusPill
             tone={(tillVariance(lastClosedTill) ?? 0) === 0 ? "success" : "warning"}
           >

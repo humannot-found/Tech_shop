@@ -30,6 +30,7 @@ import { RepairInvoiceModal } from "./pos/RepairInvoiceModal";
 import { RepairPickupsTab } from "./pos/RepairPickupsTab";
 import { ReturnModal } from "./pos/ReturnModal";
 import { SupervisorApprovalModal } from "./pos/SupervisorApprovalModal";
+import { ShiftReportModal } from "./pos/ShiftReportModal";
 import { TillPanels } from "./pos/TillPanels";
 import type {
   PosPageProps,
@@ -347,7 +348,9 @@ export function PosPage({
   }
 
   function closeTopDialog() {
-    if (till.cashMovementOpen) {
+    if (till.shiftReport) {
+      till.setShiftReport(null);
+    } else if (till.cashMovementOpen) {
       till.setCashMovementOpen(false);
     } else if (approvalOpen) {
       cancelDiscountApproval();
@@ -621,6 +624,14 @@ export function PosPage({
           busy={adjustments.adjustBusy}
           onSubmit={adjustments.submitVoid}
           onClose={adjustments.closeVoid}
+        />
+      )}
+
+      {till.shiftReport && (
+        <ShiftReportModal
+          report={till.shiftReport}
+          onPrint={printReceipt}
+          onClose={() => till.setShiftReport(null)}
         />
       )}
 

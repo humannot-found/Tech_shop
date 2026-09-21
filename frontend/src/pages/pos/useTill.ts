@@ -2,12 +2,14 @@ import { FormEvent, useEffect, useState } from "react";
 
 import {
   closeTillSession,
+  getShiftReport,
   listCashMovements,
   openTillSession,
   recordCashMovement,
 } from "../../api/client";
 import type {
   CurrentUser,
+  ShiftReport,
   Till,
   TillCashMovement,
   TillCashMovementPayload,
@@ -40,6 +42,24 @@ export function useTill({
   const [closeTillOpen, setCloseTillOpen] = useState(false);
   const [lastClosedTill, setLastClosedTill] = useState<TillSession | null>(null);
   const [tillBusy, setTillBusy] = useState(false);
+
+  const [shiftReport, setShiftReport] = useState<ShiftReport | null>(null);
+  const [shiftReportBusy, setShiftReportBusy] = useState(false);
+
+  async function openShiftReport(sessionId: string) {
+    if (!token || isPreview) {
+      setNotice("Sign in with a live cashier account to see the shift report.");
+      return;
+    }
+    setShiftReportBusy(true);
+    try {
+      setShiftReport(await getShiftReport(token, sessionId));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not load the shift report.");
+    } finally {
+      setShiftReportBusy(false);
+    }
+  }
 
   const [cashMovements, setCashMovements] = useState<TillCashMovement[]>([]);
   const [cashMovementOpen, setCashMovementOpen] = useState(false);
@@ -154,6 +174,7 @@ export function useTill({
         )}, variance ${money(variance ?? 0)}.`,
       );
       onClosed();
+      void openShiftReport(closed.id);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not close till session.");
     } finally {
@@ -178,6 +199,10 @@ export function useTill({
     tillBusy,
     handleOpenTill,
     handleCloseTill,
+    shiftReport,
+    setShiftReport,
+    shiftReportBusy,
+    openShiftReport,
     cashMovements,
     cashMovementOpen,
     setCashMovementOpen,

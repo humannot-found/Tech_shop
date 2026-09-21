@@ -49,6 +49,7 @@ import type {
   SaleReturnPayload,
   SaleVoidPayload,
   WarrantyLookup,
+  ShiftReport,
   TillCashMovement,
   TillCashMovementPayload,
   ProductVariant,
@@ -456,6 +457,12 @@ export function listPosSales(
       page_size: options?.pageSize ?? 12,
       status: options?.status,
     },
+  });
+}
+
+export function getShiftReport(token: string, sessionId: string) {
+  return apiRequest<ShiftReport>(`/pos/till-sessions/${sessionId}/report`, {
+    token,
   });
 }
 

@@ -698,6 +698,47 @@ export type TillCashMovement = ModelResponse & {
   created_by_id: UUID;
 };
 
+export type ShiftReport = {
+  till_session_id: UUID;
+  till_name: string;
+  till_code: string;
+  branch_name: string;
+  cashier_name: string;
+  status: "open" | "closed";
+  opened_at: string;
+  closed_at: string | null;
+  sale_count: number;
+  voided_count: number;
+  items_sold: number;
+  gross_sales: string;
+  discounts: string;
+  net_sales: string;
+  repair_payments: string;
+  return_count: number;
+  refunds_total: string;
+  payments: Array<{
+    method: string;
+    received: string;
+    refunded: string;
+    net: string;
+  }>;
+  opening_float: string;
+  cash_sales: string;
+  cash_refunds: string;
+  cash_in: string;
+  paid_out: string;
+  cash_drop: string;
+  expected_cash: string | null;
+  closing_cash: string | null;
+  variance: string | null;
+  movements: Array<{
+    kind: TillCashMovement["kind"];
+    amount: string;
+    reason: string;
+    created_at: string;
+  }>;
+};
+
 export type TillCashMovementPayload = {
   kind: TillCashMovement["kind"];
   amount: number;
