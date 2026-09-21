@@ -161,6 +161,18 @@ def update_count_item(
     )
     if item is None:
         raise NotFoundError("stock count item not found")
+    # Sales, transfers and receipts keep happening while a count is under way, so
+    # compare the physical count with what the system holds right now rather than
+    # with the quantity from when the count was created. Otherwise anything sold
+    # after that moment would show up as missing stock and be deducted twice.
+    on_hand = db.scalar(
+        select(StockBalance.quantity_on_hand).where(
+            StockBalance.branch_id == count.branch_id,
+            StockBalance.variant_id == item.variant_id,
+            StockBalance.is_deleted.is_(False),
+        )
+    )
+    item.expected_quantity = on_hand or 0
     item.counted_quantity = payload.counted_quantity
     item.variance = payload.counted_quantity - item.expected_quantity
     item.notes = payload.notes
