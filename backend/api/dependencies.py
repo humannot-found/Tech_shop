@@ -53,3 +53,23 @@ def require_permission(
         return principal
 
     return dependency
+
+
+def require_any_permission(
+    *permission_codes: str,
+) -> Callable[[CurrentPrincipal], AuthPrincipal]:
+    """Allows the request through if the principal holds any one of the codes."""
+
+    def dependency(principal: CurrentPrincipal) -> AuthPrincipal:
+        for code in permission_codes:
+            try:
+                enforce_permission(principal, code)
+                return principal
+            except AuthorizationError:
+                continue
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"missing permission: one of {', '.join(permission_codes)}",
+        )
+
+    return dependency

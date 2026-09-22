@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError as PydanticValidationError
 
 from backend.api.dependencies import get_current_principal
-from backend.core.permissions import ADMIN, BRANCH_MANAGER, CASHIER
+from backend.core.permissions import ADMIN, BRANCH_MANAGER, CASHIER, TECHNICIAN
 from backend.main import app
 from backend.models.database import get_db
 from backend.models.enums import TrackingType
@@ -133,6 +133,54 @@ def test_cashier_with_catalog_view_can_search_catalog(monkeypatch) -> None:
     response = TestClient(app).get("/api/v1/staff/catalog/products?q=laptop")
     assert response.status_code == 200
     assert response.json()["total"] == 0
+
+
+def test_products_with_cost_route_is_exposed() -> None:
+    assert "/api/v1/staff/catalog/products-with-cost" in app.openapi()["paths"]
+
+
+def test_cashier_cannot_see_cost_price() -> None:
+    use_principal(principal(CASHIER, {"catalog.view", "sales.process"}))
+    response = TestClient(app).get("/api/v1/staff/catalog/products-with-cost")
+    assert response.status_code == 403
+
+
+def test_technician_cannot_see_cost_price() -> None:
+    use_principal(principal(TECHNICIAN, {"repairs.view", "repairs.update"}))
+    response = TestClient(app).get("/api/v1/staff/catalog/products-with-cost")
+    assert response.status_code == 403
+
+
+def test_purchaser_can_see_cost_price(monkeypatch) -> None:
+    use_principal(principal(BRANCH_MANAGER, {"purchases.create"}))
+    monkeypatch.setattr(
+        catalog_service, "list_products", lambda *args, **kwargs: ([], 0)
+    )
+    response = TestClient(app).get("/api/v1/staff/catalog/products-with-cost")
+    assert response.status_code == 200
+
+
+def test_inventory_adjuster_can_see_cost_price(monkeypatch) -> None:
+    use_principal(principal(BRANCH_MANAGER, {"inventory.adjust"}))
+    monkeypatch.setattr(
+        catalog_service, "list_products", lambda *args, **kwargs: ([], 0)
+    )
+    response = TestClient(app).get("/api/v1/staff/catalog/products-with-cost")
+    assert response.status_code == 200
+
+
+def test_products_with_cost_ignores_publication_state(monkeypatch) -> None:
+    captured = {}
+
+    def fake_list_products(db, **kwargs):
+        captured.update(kwargs)
+        return [], 0
+
+    use_principal(principal(ADMIN, set()))
+    monkeypatch.setattr(catalog_service, "list_products", fake_list_products)
+    response = TestClient(app).get("/api/v1/staff/catalog/products-with-cost")
+    assert response.status_code == 200
+    assert captured["is_published"] is None
 
 
 def test_variant_create_rejects_selling_price_below_cost() -> None:

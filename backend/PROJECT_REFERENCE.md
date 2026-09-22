@@ -366,11 +366,12 @@ matching `backend/schemas/*_schemas.py` file or in Swagger.
 | PATCH | `/catalog/brands/{brand_id}` | `brand_id` path | `BrandUpdate` | Updates a brand |
 | POST | `/catalog/products/import/validate` | - | CSV upload/body | Validates catalog CSV without mutating data |
 | POST | `/catalog/products/import` | - | CSV upload/body | Imports valid catalog CSV rows |
-| GET | `/catalog/products` | `page`, `page_size`, `q`, `category_id`, `brand_id`, `is_active`, `is_published` query | - | Lists products |
+| GET | `/catalog/products` | `page`, `page_size`, `q`, `category_id`, `brand_id`, `is_active`, `is_published` query | - | Lists products; variant `cost_price`/`minimum_selling_price` are stripped out (this is what POS, storefront, and general catalog browsing use) |
+| GET | `/catalog/products-with-cost` | `page`, `page_size`, `q`, `category_id`, `brand_id`, `is_active` query | - | Same search as above but variants include `cost_price`/`minimum_selling_price`, for pricing purchase orders or stock corrections. Requires `purchases.create`, `inventory.adjust`, or `catalog.manage`. Always includes unpublished items |
 | POST | `/catalog/products` | - | `ProductCreate` | Creates product with at least one variant |
 | GET | `/catalog/products/{product_id}` | `product_id` path | - | Gets one product |
 | PATCH | `/catalog/products/{product_id}` | `product_id` path | `ProductUpdate` | Updates product metadata |
-| PATCH | `/catalog/products/{product_id}/publication` | `product_id` path | `ProductPublicationUpdate` | Publishes/unpublishes product |
+| PATCH | `/catalog/products/{product_id}/publication` | `product_id` path | `ProductPublicationUpdate` | Publishes/unpublishes product to the public website (requires an active variant and at least one image). `is_published` is a website-only concept: `is_active` alone governs whether staff can sell an item in POS |
 | POST | `/catalog/products/{product_id}/variants` | `product_id` path | `ProductVariantCreate` | Adds a variant; `selling_price` below `cost_price` is rejected; an omitted `minimum_selling_price` defaults to cost + 5% (capped at the selling price) |
 | PATCH | `/catalog/variants/{variant_id}` | `variant_id` path | `ProductVariantUpdate` | Updates a variant; the effective selling price (new or existing) can't go below the effective cost price, and `minimum_selling_price` can be raised/lowered but never cleared to null |
 | POST | `/catalog/products/{product_id}/images` | `product_id` path | `ProductImageCreate` | Adds product image |

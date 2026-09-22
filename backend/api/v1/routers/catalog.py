@@ -3,7 +3,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
 
-from backend.api.dependencies import DatabaseSession, require_permission
+from backend.api.dependencies import (
+    DatabaseSession,
+    require_any_permission,
+    require_permission,
+)
 from backend.schemas.base_schemas import Page
 from backend.schemas.products_schemas import (
     BrandCreate,
@@ -38,6 +42,15 @@ CatalogViewPrincipal = Annotated[
 ]
 CatalogManagePrincipal = Annotated[
     AuthPrincipal, Depends(require_permission("catalog.manage"))
+]
+# Cost price is never sent to a cashier browsing the till or the catalog
+# screen. This is only for the roles that actually negotiate/verify it:
+# purchasing, inventory correction, and catalog management.
+CatalogCostViewPrincipal = Annotated[
+    AuthPrincipal,
+    Depends(
+        require_any_permission("purchases.create", "inventory.adjust", "catalog.manage")
+    ),
 ]
 MAX_CSV_BYTES = 5 * 1024 * 1024
 
@@ -213,6 +226,38 @@ def list_products(
         total=total,
         page=page,
         page_size=page_size,
+    )
+
+
+@router.get("/products-with-cost", response_model=Page[ProductResponse])
+def list_products_with_cost(
+    principal: CatalogCostViewPrincipal,
+    db: DatabaseSession,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=200),
+    q: str | None = Query(default=None, max_length=100),
+    category_id: UUID | None = None,
+    brand_id: UUID | None = None,
+    is_active: bool | None = None,
+) -> Page[ProductResponse]:
+    """Same catalog search as GET /products, but with cost_price and
+    minimum_selling_price on each variant for staff who price purchase orders
+    or correct stock, rather than the stripped-down view everyone else gets.
+    Always includes unpublished items: whether something is on the public
+    website has no bearing on whether it can be bought from a supplier.
+    """
+    items, total = catalog_service.list_products(
+        db,
+        page=page,
+        page_size=page_size,
+        query=q,
+        category_id=category_id,
+        brand_id=brand_id,
+        is_active=is_active,
+        is_published=None,
+    )
+    return Page[ProductResponse](
+        items=items, total=total, page=page, page_size=page_size
     )
 
 
