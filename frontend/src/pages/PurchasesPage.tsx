@@ -5,7 +5,7 @@ import {
   createPurchaseOrder,
   createSupplier,
   listBranches,
-  listCatalogProducts,
+  listCatalogProductsWithCost,
   listPurchaseOrderReceipts,
   listPurchaseOrders,
   listSuppliers,
@@ -14,8 +14,8 @@ import {
 } from "../api/client";
 import type {
   Branch,
-  CatalogProduct,
   GoodsReceipt,
+  Product,
   PurchaseOrder,
   Supplier,
 } from "../api/types";
@@ -36,6 +36,8 @@ type VariantOption = {
   sku: string;
   trackingType: "bulk" | "serial" | "imei";
   price: number;
+  /** The catalog's own reference cost, when the caller is allowed to see it. */
+  costPrice: number | null;
   searchText: string;
 };
 
@@ -117,7 +119,7 @@ function splitIdentifiers(value: string) {
     .filter(Boolean);
 }
 
-function catalogToVariantOptions(products: CatalogProduct[]): VariantOption[] {
+function catalogToVariantOptions(products: Product[]): VariantOption[] {
   return products.flatMap((product) =>
     product.variants.map((variant) => ({
       id: variant.id,
@@ -125,6 +127,7 @@ function catalogToVariantOptions(products: CatalogProduct[]): VariantOption[] {
       sku: variant.sku,
       trackingType: variant.tracking_type,
       price: Number(variant.selling_price),
+      costPrice: variant.cost_price != null ? Number(variant.cost_price) : null,
       searchText: [
         product.name,
         product.slug,
@@ -138,10 +141,7 @@ function catalogToVariantOptions(products: CatalogProduct[]): VariantOption[] {
   );
 }
 
-function mergeCatalogProducts(
-  current: CatalogProduct[],
-  incoming: CatalogProduct[],
-) {
+function mergeCatalogProducts(current: Product[], incoming: Product[]) {
   const byId = new Map(current.map((product) => [product.id, product]));
   incoming.forEach((product) => byId.set(product.id, product));
   return Array.from(byId.values());
@@ -151,8 +151,10 @@ function itemSkuOptionLabel(option: VariantOption) {
   return `${option.sku} — ${option.label} — ${titleize(option.trackingType)}`;
 }
 
+/** The catalog's own cost when known, otherwise a rough guess from selling price. */
 function estimateUnitCost(option?: VariantOption) {
   if (!option) return "";
+  if (option.costPrice != null) return String(option.costPrice);
   return String(Math.max(1, Math.round(option.price * 0.65)));
 }
 
@@ -257,8 +259,8 @@ export function PurchasesPage() {
   const [branches, setBranches] = useState<Branch[]>(demoBranches);
   const [orders, setOrders] = useState<PurchaseOrder[]>(demoPurchaseOrders);
   const [suppliers, setSuppliers] = useState<Supplier[]>(demoSuppliers);
-  const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([]);
-  const [catalogProductCache, setCatalogProductCache] = useState<CatalogProduct[]>([]);
+  const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
+  const [catalogProductCache, setCatalogProductCache] = useState<Product[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState(
     user?.branch_id ?? demoBranches[0]?.id ?? "",
   );
@@ -291,6 +293,7 @@ export function PurchasesPage() {
         sku: product.sku,
         trackingType: product.trackingType,
         price: product.price,
+        costPrice: null,
         searchText: [
           product.name,
           product.variantName,
@@ -596,8 +599,7 @@ export function PurchasesPage() {
     if (!token || isPreview) return;
 
     let active = true;
-    listCatalogProducts(token, productSearch, {
-      isPublished: null,
+    listCatalogProductsWithCost(token, productSearch, {
       pageSize: 100,
     })
       .then((result) => {

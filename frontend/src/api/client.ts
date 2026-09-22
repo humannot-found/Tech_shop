@@ -216,6 +216,29 @@ export function listCatalogProducts(
   });
 }
 
+/**
+ * Same catalog search as listCatalogProducts, but with real cost_price and
+ * minimum_selling_price on each variant instead of the stripped-down view.
+ * Requires purchases.create, inventory.adjust, or catalog.manage; always
+ * includes unpublished items, since purchasing doesn't care whether an item
+ * is listed on the public website yet.
+ */
+export function listCatalogProductsWithCost(
+  token: string,
+  query: string,
+  options: { isActive?: boolean | null; pageSize?: number } = {},
+) {
+  return apiRequest<Page<Product>>("/catalog/products-with-cost", {
+    token,
+    query: {
+      q: query,
+      page: 1,
+      page_size: options.pageSize ?? 48,
+      is_active: options.isActive === undefined ? true : options.isActive,
+    },
+  });
+}
+
 export function listCategories(token: string) {
   return apiRequest<Category[]>("/catalog/categories", { token });
 }
