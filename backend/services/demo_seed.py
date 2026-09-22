@@ -301,7 +301,14 @@ def _soft_delete_legacy_demo_catalog(db: Session) -> None:
 
 
 def _category(
-    db: Session, result: DemoSeedResult, principal: AuthPrincipal, name: str, slug: str
+    db: Session,
+    result: DemoSeedResult,
+    principal: AuthPrincipal,
+    name: str,
+    slug: str,
+    *,
+    default_warranty_months: int = 0,
+    default_tracking_type: TrackingType | None = None,
 ) -> Category:
     item = db.scalar(
         select(Category).where(
@@ -316,7 +323,13 @@ def _category(
         item = catalog.create_category(
             db,
             principal,
-            CategoryCreate(name=name, slug=slug, description=f"Seeded {name.lower()}"),
+            CategoryCreate(
+                name=name,
+                slug=slug,
+                description=f"Seeded {name.lower()}",
+                default_warranty_months=default_warranty_months,
+                default_tracking_type=default_tracking_type,
+            ),
         )
         result.add("categories")
     else:
@@ -324,6 +337,8 @@ def _category(
         item.slug = slug
         item.description = f"Seeded {name.lower()}"
         item.is_active = True
+        item.default_warranty_months = default_warranty_months
+        item.default_tracking_type = default_tracking_type
     return item
 
 
@@ -1473,12 +1488,40 @@ def seed_demo_data(db: Session, *, password: str = DEMO_PASSWORD) -> DemoSeedRes
     _soft_delete_legacy_demo_catalog(db)
 
     categories = {
-        "laptops": _category(db, result, admin, "Laptops", "laptops"),
-        "phones": _category(db, result, admin, "Phones", "phones"),
-        "accessories": _category(
-            db, result, admin, "Accessories", "accessories"
+        "laptops": _category(
+            db,
+            result,
+            admin,
+            "Laptops",
+            "laptops",
+            default_warranty_months=12,
+            default_tracking_type=TrackingType.SERIAL,
         ),
-        "parts": _category(db, result, admin, "Repair Parts", "repair-parts"),
+        "phones": _category(
+            db,
+            result,
+            admin,
+            "Phones",
+            "phones",
+            default_warranty_months=6,
+            default_tracking_type=TrackingType.IMEI,
+        ),
+        "accessories": _category(
+            db,
+            result,
+            admin,
+            "Accessories",
+            "accessories",
+            default_tracking_type=TrackingType.BULK,
+        ),
+        "parts": _category(
+            db,
+            result,
+            admin,
+            "Repair Parts",
+            "repair-parts",
+            default_tracking_type=TrackingType.BULK,
+        ),
     }
     brands = {
         "apple": _brand(db, result, admin, "Apple"),

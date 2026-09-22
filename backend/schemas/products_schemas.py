@@ -14,6 +14,10 @@ class CategoryCreate(BaseSchema):
         min_length=2, max_length=170, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
     )
     description: str | None = Field(default=None, max_length=500)
+    # Prefilled on the new-item form for products in this category; either can
+    # still be changed per item before saving.
+    default_warranty_months: int = Field(default=0, ge=0, le=120)
+    default_tracking_type: TrackingType | None = None
 
 
 class CategoryUpdate(BaseSchema):
@@ -21,10 +25,12 @@ class CategoryUpdate(BaseSchema):
     name: str | None = Field(default=None, min_length=2, max_length=150)
     description: str | None = Field(default=None, max_length=500)
     is_active: bool | None = None
+    default_warranty_months: int | None = Field(default=None, ge=0, le=120)
+    default_tracking_type: TrackingType | None = None
 
     @model_validator(mode="after")
     def reject_null_required_fields(self) -> "CategoryUpdate":
-        for field in {"name", "is_active"} & self.model_fields_set:
+        for field in {"name", "is_active", "default_warranty_months"} & self.model_fields_set:
             if getattr(self, field) is None:
                 raise ValueError(f"{field} cannot be null")
         return self
@@ -36,6 +42,8 @@ class CategoryResponse(ModelResponse):
     slug: str
     description: str | None
     is_active: bool
+    default_warranty_months: int
+    default_tracking_type: TrackingType | None
 
 
 class BrandCreate(BaseSchema):

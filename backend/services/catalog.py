@@ -54,6 +54,12 @@ def category_snapshot(category: Category) -> dict[str, Any]:
         "slug": category.slug,
         "description": category.description,
         "is_active": category.is_active,
+        "default_warranty_months": category.default_warranty_months,
+        "default_tracking_type": (
+            category.default_tracking_type.value
+            if category.default_tracking_type
+            else None
+        ),
     }
 
 
@@ -174,6 +180,8 @@ def create_category(
         slug=payload.slug,
         description=payload.description,
         is_active=True,
+        default_warranty_months=payload.default_warranty_months,
+        default_tracking_type=payload.default_tracking_type,
     )
     db.add(category)
     db.flush()

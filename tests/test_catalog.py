@@ -10,7 +10,12 @@ from backend.core.permissions import ADMIN, BRANCH_MANAGER, CASHIER
 from backend.main import app
 from backend.models.database import get_db
 from backend.models.enums import TrackingType
-from backend.schemas.products_schemas import ProductVariantCreate, ProductVariantUpdate
+from backend.schemas.products_schemas import (
+    CategoryCreate,
+    CategoryUpdate,
+    ProductVariantCreate,
+    ProductVariantUpdate,
+)
 from backend.services import catalog as catalog_service
 from backend.services.auth import AuthPrincipal
 from backend.services.catalog_import import build_import_plan
@@ -26,6 +31,7 @@ def variant_payload(**overrides) -> dict:
     }
     payload.update(overrides)
     return payload
+
 
 VALID_CSV = b"""product_name,product_slug,variant_name,sku,cost_price,selling_price,tracking_type,attributes_json
 ThinkPad T14,thinkpad-t14,16GB RAM,LEN-T14-16,100000,125000,serial,"{""ram"":""16GB""}"
@@ -173,6 +179,32 @@ def test_variant_update_allows_partial_price_changes() -> None:
     update = ProductVariantUpdate(selling_price=Decimal("160.00"))
     assert update.cost_price is None
     assert "minimum_selling_price" not in update.model_fields_set
+
+
+def test_category_create_defaults_warranty_to_zero_and_no_tracking_type() -> None:
+    category = CategoryCreate(name="Cables", slug="cables")
+    assert category.default_warranty_months == 0
+    assert category.default_tracking_type is None
+
+
+def test_category_create_accepts_explicit_defaults() -> None:
+    category = CategoryCreate(
+        name="Phones",
+        slug="phones",
+        default_warranty_months=6,
+        default_tracking_type=TrackingType.IMEI,
+    )
+    assert category.default_warranty_months == 6
+    assert category.default_tracking_type == TrackingType.IMEI
+
+
+def test_category_update_cannot_null_warranty_but_can_clear_tracking_type() -> None:
+    with pytest.raises(PydanticValidationError):
+        CategoryUpdate(default_warranty_months=None)
+    # Clearing the tracking-type suggestion back to "no suggestion" is allowed.
+    update = CategoryUpdate(default_tracking_type=None)
+    assert "default_tracking_type" in update.model_fields_set
+    assert update.default_tracking_type is None
 
 
 def test_admin_can_validate_csv_upload() -> None:

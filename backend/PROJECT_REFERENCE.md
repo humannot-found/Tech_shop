@@ -357,9 +357,9 @@ matching `backend/schemas/*_schemas.py` file or in Swagger.
 | Method | Path | Params | Body | What it does |
 | --- | --- | --- | --- | --- |
 | GET | `/catalog/categories` | - | - | Lists product categories |
-| POST | `/catalog/categories` | - | `CategoryCreate` | Creates a category |
+| POST | `/catalog/categories` | - | `CategoryCreate` | Creates a category; `default_warranty_months`/`default_tracking_type` prefill the new-item form for products in it |
 | GET | `/catalog/categories/{category_id}` | `category_id` path | - | Gets one category |
-| PATCH | `/catalog/categories/{category_id}` | `category_id` path | `CategoryUpdate` | Updates a category |
+| PATCH | `/catalog/categories/{category_id}` | `category_id` path | `CategoryUpdate` | Updates a category; `default_warranty_months` can't be cleared to null, `default_tracking_type` can (meaning "no suggestion") |
 | GET | `/catalog/brands` | - | - | Lists brands |
 | POST | `/catalog/brands` | - | `BrandCreate` | Creates a brand |
 | GET | `/catalog/brands/{brand_id}` | `brand_id` path | - | Gets one brand |

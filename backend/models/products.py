@@ -29,6 +29,20 @@ class Category(BaseModel):
     slug: Mapped[str] = mapped_column(String(170), unique=True, nullable=False)
     description: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Prefilled on the new-item form for a product in this category; the
+    # cashier/catalog manager can still override either before saving.
+    default_warranty_months: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False
+    )
+    default_tracking_type: Mapped[TrackingType | None] = mapped_column(
+        Enum(
+            TrackingType,
+            values_callable=enum_values,
+            native_enum=False,
+            name="tracking_type",
+        ),
+        nullable=True,
+    )
 
 
 class Product(BaseModel):
