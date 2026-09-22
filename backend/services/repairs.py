@@ -15,7 +15,7 @@ from backend.models.enums import (
 )
 from backend.models.inventory import SerializedUnit, StockBalance
 from backend.models.payments import Payment
-from backend.models.products import ProductVariant
+from backend.models.products import Product, ProductVariant
 from backend.models.repairs import RepairPart, RepairStatusHistory, RepairTicket
 from backend.models.roles import Role
 from backend.models.users import User
