@@ -15,11 +15,17 @@ from backend.schemas.inventory_schemas import (
     StockAdjustmentCreate,
     StockTransferCreate,
 )
+from backend.schemas.stocktake_schemas import (
+    SerializedUnitReviewDecision,
+    StockCountScanCreate,
+)
+from backend.services import inventory as inventory_service
 from backend.services import inventory_control
 from backend.services import stocktake as stocktake_service
 from backend.services import transfers as transfer_service
 from backend.services.auth import AuthPrincipal
 from backend.services.authorization import AuthorizationError
+from backend.services.exceptions import ConflictError
 
 
 def principal(role_code: str, permissions: set[str], branch_id=None) -> AuthPrincipal:
@@ -162,3 +168,92 @@ def test_cashier_cannot_set_reorder_levels() -> None:
 
 def test_reorder_levels_route_is_exposed() -> None:
     assert "/api/v1/staff/inventory/reorder-levels" in app.openapi()["paths"]
+
+
+def test_stock_count_scan_routes_are_exposed() -> None:
+    paths = app.openapi()["paths"]
+    assert "/api/v1/staff/inventory/stock-counts/{count_id}/items/{item_id}/scans" in paths
+    assert (
+        "/api/v1/staff/inventory/stock-counts/{count_id}/items/{item_id}/scans/{scan_id}"
+        in paths
+    )
+    assert (
+        "/api/v1/staff/inventory/stock-counts/{count_id}/items/{item_id}/confirm"
+        in paths
+    )
+    assert (
+        "/api/v1/staff/inventory/serialized-units/{unit_id}/review-decision" in paths
+    )
+
+
+def test_scan_identifier_must_have_a_minimum_length() -> None:
+    with pytest.raises(PydanticValidationError):
+        StockCountScanCreate(identifier="ab")
+
+
+def test_review_decision_only_accepts_found_or_lost() -> None:
+    with pytest.raises(PydanticValidationError):
+        SerializedUnitReviewDecision(decision="deleted")
+
+
+def test_cashier_cannot_scan_a_stock_count_item() -> None:
+    actor = principal(CASHIER, {"inventory.view"})
+    with pytest.raises(AuthorizationError):
+        stocktake_service.scan_stock_count_item(
+            object(),
+            actor,
+            uuid4(),
+            uuid4(),
+            StockCountScanCreate(identifier="352000000000101"),
+        )
+
+
+def test_cashier_cannot_resolve_a_flagged_unit() -> None:
+    actor = principal(CASHIER, {"inventory.view"})
+    with pytest.raises(AuthorizationError):
+        inventory_control.resolve_unit_review(
+            object(), actor, uuid4(), SerializedUnitReviewDecision(decision="found")
+        )
+
+
+def test_inventory_manager_cannot_resolve_a_flagged_unit() -> None:
+    actor = principal(INVENTORY_MANAGER, {"inventory.adjust"})
+    with pytest.raises(AuthorizationError):
+        inventory_control.resolve_unit_review(
+            object(), actor, uuid4(), SerializedUnitReviewDecision(decision="lost")
+        )
+
+
+def test_mark_unit_under_review_requires_available_or_reserved() -> None:
+    from types import SimpleNamespace
+
+    from backend.models.enums import SerializedUnitStatus
+
+    unit = SimpleNamespace(status=SerializedUnitStatus.SOLD)
+    with pytest.raises(ConflictError):
+        inventory_service.mark_unit_under_review(
+            object(),
+            unit=unit,
+            performed_by_id=uuid4(),
+            reference_type="stock_count",
+            reference_id=uuid4(),
+            reason="not found during count",
+        )
+
+
+def test_resolve_unit_review_requires_a_unit_under_review() -> None:
+    from types import SimpleNamespace
+
+    from backend.models.enums import SerializedUnitStatus
+
+    unit = SimpleNamespace(status=SerializedUnitStatus.AVAILABLE)
+    with pytest.raises(ConflictError):
+        inventory_service.resolve_unit_review(
+            object(),
+            unit=unit,
+            decision="lost",
+            performed_by_id=uuid4(),
+            reference_type="serialized_unit_review",
+            reference_id=uuid4(),
+            reason="test",
+        )

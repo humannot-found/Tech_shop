@@ -31,7 +31,7 @@ from backend.models.sales import (
     TillCashMovement,
     TillSession,
 )
-from backend.models.stocktake import StockCount, StockCountItem
+from backend.models.stocktake import StockCount, StockCountItem, StockCountUnitScan
 from backend.models.suppliers import Supplier
 from backend.models.users import User
 from backend.models.warranty import Warranty
@@ -76,7 +76,11 @@ from backend.schemas.sales_schemas import (
     TillResponse,
     TillSessionResponse,
 )
-from backend.schemas.stocktake_schemas import StockCountItemResponse, StockCountResponse
+from backend.schemas.stocktake_schemas import (
+    StockCountItemResponse,
+    StockCountResponse,
+    StockCountScanResponse,
+)
 from backend.schemas.supplier_schemas import SupplierResponse
 from backend.schemas.user_schemas import (
     PermissionResponse,
@@ -101,7 +105,12 @@ PAIRS = [
     (StockTransfer, StockTransferResponse, {"items"}),
     (StockTransferItem, StockTransferItemResponse, set()),
     (StockCount, StockCountResponse, {"items"}),
-    (StockCountItem, StockCountItemResponse, set()),
+    (
+        StockCountItem,
+        StockCountItemResponse,
+        {"tracking_type", "scans", "unexpected_scan_count"},
+    ),
+    (StockCountUnitScan, StockCountScanResponse, {"unit_identifier"}),
     (Payment, PaymentResponse, set()),
     (Permission, PermissionResponse, set()),
     (Category, CategoryResponse, set()),

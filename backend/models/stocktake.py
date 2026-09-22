@@ -1,7 +1,15 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -64,3 +72,29 @@ class StockCountItem(BaseModel):
     counted_quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
     variance: Mapped[int | None] = mapped_column(Integer, nullable=True)
     notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class StockCountUnitScan(BaseModel):
+    """One serialized unit found during a physical count of a serial/IMEI item."""
+
+    __tablename__ = "stock_count_unit_scans"
+    __table_args__ = (
+        UniqueConstraint(
+            "stock_count_item_id",
+            "serialized_unit_id",
+            name="stock_count_unit_scan_unique",
+        ),
+    )
+
+    stock_count_item_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("stock_count_items.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    serialized_unit_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("serialized_units.id"), nullable=False
+    )
+    scanned_by_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )

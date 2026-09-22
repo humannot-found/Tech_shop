@@ -273,6 +273,109 @@ def apply_stock_adjustment(
     return movement
 
 
+def mark_unit_under_review(
+    db: Session,
+    *,
+    unit: SerializedUnit,
+    performed_by_id: UUID,
+    reference_type: str,
+    reference_id: UUID,
+    reason: str,
+) -> StockMovement:
+    """Pulls a unit out of sellable stock because a physical count did not find it.
+
+    The unit is not written off yet; a manager resolves it later as found or lost.
+    """
+    if unit.status not in {SerializedUnitStatus.AVAILABLE, SerializedUnitStatus.RESERVED}:
+        raise ConflictError("only available or reserved units can be put under review")
+    balance = db.scalar(
+        select(StockBalance)
+        .where(
+            StockBalance.branch_id == unit.branch_id,
+            StockBalance.variant_id == unit.variant_id,
+        )
+        .with_for_update()
+    )
+    if balance is None:
+        raise ConflictError("stock balance does not exist")
+    was_reserved = unit.status == SerializedUnitStatus.RESERVED
+    unit.status = SerializedUnitStatus.UNDER_REVIEW
+    balance.quantity_on_hand = max(0, balance.quantity_on_hand - 1)
+    if was_reserved:
+        # The reservation this unit backed (e.g. an online order) can no longer be
+        # honored by it; downstream fulfillment will fail with its own clear error.
+        balance.reserved_quantity = max(0, balance.reserved_quantity - 1)
+    if balance.reserved_quantity > balance.quantity_on_hand:
+        # reserved_quantity can also hold reservations not yet allocated to any
+        # specific unit (e.g. a pending online order). Losing a unit can leave less
+        # physical stock than is reserved; scale the reservation back rather than
+        # violate the stock_reserved_within_on_hand constraint.
+        balance.reserved_quantity = balance.quantity_on_hand
+    movement = StockMovement(
+        branch_id=unit.branch_id,
+        variant_id=unit.variant_id,
+        serialized_unit_id=unit.id,
+        movement_type=StockMovementType.ADJUSTMENT,
+        quantity_delta=-1,
+        unit_cost=unit.unit_cost,
+        reference_type=reference_type,
+        reference_id=reference_id,
+        idempotency_key=f"{reference_type}:{reference_id}:review:{unit.id}",
+        performed_by_id=performed_by_id,
+        note=reason,
+    )
+    db.add(movement)
+    db.flush()
+    return movement
+
+
+def resolve_unit_review(
+    db: Session,
+    *,
+    unit: SerializedUnit,
+    decision: str,
+    performed_by_id: UUID,
+    reference_type: str,
+    reference_id: UUID,
+    reason: str,
+) -> StockMovement | None:
+    """Finalizes a unit under review: restores it to stock, or writes it off as lost."""
+    if unit.status != SerializedUnitStatus.UNDER_REVIEW:
+        raise ConflictError("only a unit under review can be resolved")
+    if decision == "lost":
+        unit.status = SerializedUnitStatus.LOST
+        db.flush()
+        return None
+    balance = db.scalar(
+        select(StockBalance)
+        .where(
+            StockBalance.branch_id == unit.branch_id,
+            StockBalance.variant_id == unit.variant_id,
+        )
+        .with_for_update()
+    )
+    if balance is None:
+        raise ConflictError("stock balance does not exist")
+    unit.status = SerializedUnitStatus.AVAILABLE
+    balance.quantity_on_hand += 1
+    movement = StockMovement(
+        branch_id=unit.branch_id,
+        variant_id=unit.variant_id,
+        serialized_unit_id=unit.id,
+        movement_type=StockMovementType.ADJUSTMENT,
+        quantity_delta=1,
+        unit_cost=unit.unit_cost,
+        reference_type=reference_type,
+        reference_id=reference_id,
+        idempotency_key=f"{reference_type}:{reference_id}:review-found:{unit.id}",
+        performed_by_id=performed_by_id,
+        note=reason,
+    )
+    db.add(movement)
+    db.flush()
+    return movement
+
+
 def sell_stock(
     db: Session,
     *,

@@ -17,9 +17,11 @@ from backend.schemas.inventory_schemas import (
     StockTransferResponse,
 )
 from backend.schemas.stocktake_schemas import (
+    SerializedUnitReviewDecision,
     StockCountCreate,
     StockCountItemUpdate,
     StockCountResponse,
+    StockCountScanCreate,
 )
 from backend.services import inventory_control
 from backend.services import stocktake as stocktake_service
@@ -268,6 +270,77 @@ def update_stock_count_item(
     )
     db.commit()
     return count
+
+
+@router.post(
+    "/stock-counts/{count_id}/items/{item_id}/scans",
+    response_model=StockCountResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def scan_stock_count_item(
+    count_id: UUID,
+    item_id: UUID,
+    payload: StockCountScanCreate,
+    principal: InventoryAdjustPrincipal,
+    db: DatabaseSession,
+) -> StockCountResponse:
+    count = stocktake_service.scan_stock_count_item(
+        db, principal, count_id, item_id, payload
+    )
+    db.commit()
+    return count
+
+
+@router.delete(
+    "/stock-counts/{count_id}/items/{item_id}/scans/{scan_id}",
+    response_model=StockCountResponse,
+)
+def remove_stock_count_scan(
+    count_id: UUID,
+    item_id: UUID,
+    scan_id: UUID,
+    principal: InventoryAdjustPrincipal,
+    db: DatabaseSession,
+) -> StockCountResponse:
+    count = stocktake_service.remove_stock_count_scan(
+        db, principal, count_id, item_id, scan_id
+    )
+    db.commit()
+    return count
+
+
+@router.post(
+    "/stock-counts/{count_id}/items/{item_id}/confirm",
+    response_model=StockCountResponse,
+)
+def confirm_serialized_count_item(
+    count_id: UUID,
+    item_id: UUID,
+    principal: InventoryAdjustPrincipal,
+    db: DatabaseSession,
+) -> StockCountResponse:
+    """Confirms an IMEI/serial item as counted, including when nothing was found."""
+    count = stocktake_service.confirm_serialized_count_item(
+        db, principal, count_id, item_id
+    )
+    db.commit()
+    return count
+
+
+@router.post(
+    "/serialized-units/{unit_id}/review-decision",
+    response_model=SerializedUnitView,
+)
+def resolve_unit_review(
+    unit_id: UUID,
+    payload: SerializedUnitReviewDecision,
+    principal: InventoryAdjustPrincipal,
+    db: DatabaseSession,
+) -> SerializedUnitView:
+    """Resolves a unit flagged during a stock count as found (back to stock) or lost."""
+    item = inventory_control.resolve_unit_review(db, principal, unit_id, payload)
+    db.commit()
+    return item
 
 
 @router.post("/stock-counts/{count_id}/submit", response_model=StockCountResponse)

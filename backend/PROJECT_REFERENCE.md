@@ -414,10 +414,14 @@ matching `backend/schemas/*_schemas.py` file or in Swagger.
 | POST | `/inventory/transfers/{transfer_id}/cancel` | `transfer_id` path | - | Cancels draft/approved transfer |
 | GET | `/inventory/stock-counts` | `branch_id` query | - | Lists stock counts |
 | POST | `/inventory/stock-counts` | - | `StockCountCreate` | Opens stock count |
-| PATCH | `/inventory/stock-counts/{count_id}/items/{item_id}` | `count_id`, `item_id` path | `StockCountItemUpdate` | Records counted quantity |
+| PATCH | `/inventory/stock-counts/{count_id}/items/{item_id}` | `count_id`, `item_id` path | `StockCountItemUpdate` | Records counted quantity for a bulk item; rejected for IMEI/serial items |
+| POST | `/inventory/stock-counts/{count_id}/items/{item_id}/scans` | `count_id`, `item_id` path | `StockCountScanCreate` | Scans one IMEI/serial unit found during the count |
+| DELETE | `/inventory/stock-counts/{count_id}/items/{item_id}/scans/{scan_id}` | `count_id`, `item_id`, `scan_id` path | - | Undoes a mis-scan |
+| POST | `/inventory/stock-counts/{count_id}/items/{item_id}/confirm` | `count_id`, `item_id` path | - | Confirms an IMEI/serial item as counted, including when nothing was scanned |
 | POST | `/inventory/stock-counts/{count_id}/submit` | `count_id` path | - | Submits stock count |
-| POST | `/inventory/stock-counts/{count_id}/approve` | `count_id` path | - | Approves stock count and applies bulk variances |
+| POST | `/inventory/stock-counts/{count_id}/approve` | `count_id` path | - | Approves stock count: applies bulk variances, and puts unscanned IMEI/serial units "under review" (not lost outright) |
 | POST | `/inventory/stock-counts/{count_id}/cancel` | `count_id` path | - | Cancels open stock count |
+| POST | `/inventory/serialized-units/{unit_id}/review-decision` | `unit_id` path | `SerializedUnitReviewDecision` | Resolves a unit under review as found (back to stock) or lost (`Admin`/`Branch Manager`) |
 
 ### POS
 

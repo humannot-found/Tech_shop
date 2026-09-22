@@ -29,6 +29,9 @@ class SerializedUnitStatus(StringEnum):
     RETURNED = "returned"
     DAMAGED = "damaged"
     QUARANTINED = "quarantined"
+    # Not found during a physical count. A manager resolves it as found or lost.
+    UNDER_REVIEW = "under_review"
+    LOST = "lost"
 
 
 class StockMovementType(StringEnum):

@@ -17,6 +17,7 @@ from backend.schemas.inventory_schemas import (
     StockAdjustmentCreate,
     StockMovementResponse,
 )
+from backend.schemas.stocktake_schemas import SerializedUnitReviewDecision
 from backend.services import inventory
 from backend.services.audit import record_audit
 from backend.services.auth import AuthPrincipal
@@ -182,6 +183,25 @@ def set_reorder_levels(
     return results
 
 
+def _serialized_unit_view(
+    unit: SerializedUnit, variant: ProductVariant, product: Product
+) -> SerializedUnitView:
+    return SerializedUnitView(
+        id=unit.id,
+        branch_id=unit.branch_id,
+        product_id=product.id,
+        product_name=product.name,
+        variant_id=variant.id,
+        variant_name=variant.name,
+        sku=variant.sku,
+        serial_number=unit.serial_number,
+        imei=unit.imei,
+        status=unit.status,
+        condition=unit.condition,
+        received_at=unit.received_at,
+    )
+
+
 def list_serialized_units(
     db: Session,
     principal: AuthPrincipal,
@@ -223,20 +243,7 @@ def list_serialized_units(
         .limit(page_size)
     ).all()
     return [
-        SerializedUnitView(
-            id=unit.id,
-            branch_id=unit.branch_id,
-            product_id=product.id,
-            product_name=product.name,
-            variant_id=variant.id,
-            variant_name=variant.name,
-            sku=variant.sku,
-            serial_number=unit.serial_number,
-            imei=unit.imei,
-            status=unit.status,
-            condition=unit.condition,
-            received_at=unit.received_at,
-        )
+        _serialized_unit_view(unit, variant, product)
         for unit, variant, product in rows
     ], total
 
@@ -398,3 +405,46 @@ def decide_adjustment(
         after={"status": request.status.value},
     )
     return ApprovalRequestResponse.model_validate(request)
+
+
+def resolve_unit_review(
+    db: Session,
+    principal: AuthPrincipal,
+    unit_id: UUID,
+    payload: SerializedUnitReviewDecision,
+) -> SerializedUnitView:
+    """Resolves a unit a stock count could not find: back to available, or lost."""
+    if principal.role_code not in {ADMIN, BRANCH_MANAGER}:
+        raise AuthorizationError(
+            "only an Admin or Branch Manager can resolve a flagged unit"
+        )
+    row = db.execute(
+        select(SerializedUnit, ProductVariant, Product)
+        .join(ProductVariant, ProductVariant.id == SerializedUnit.variant_id)
+        .join(Product, Product.id == ProductVariant.product_id)
+        .where(SerializedUnit.id == unit_id, SerializedUnit.is_deleted.is_(False))
+        .with_for_update(of=SerializedUnit)
+    ).first()
+    if row is None:
+        raise NotFoundError("serialized unit not found")
+    unit, variant, product = row
+    enforce_branch_scope(principal, unit.branch_id)
+    inventory.resolve_unit_review(
+        db,
+        unit=unit,
+        decision=payload.decision,
+        performed_by_id=principal.user_id,
+        reference_type="serialized_unit_review",
+        reference_id=unit.id,
+        reason=payload.notes or f"Marked {payload.decision} after stock count review",
+    )
+    record_audit(
+        db,
+        actor_id=principal.user_id,
+        branch_id=unit.branch_id,
+        action=f"inventory.unit_review_{payload.decision}",
+        resource_type="serialized_unit",
+        resource_id=unit.id,
+        after={"decision": payload.decision, "notes": payload.notes},
+    )
+    return _serialized_unit_view(unit, variant, product)
