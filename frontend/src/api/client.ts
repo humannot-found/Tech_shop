@@ -82,10 +82,12 @@ import type {
   StaffUserCreatePayload,
   StaffUserUpdatePayload,
   StaffUser,
+  SerializedUnitReviewDecisionPayload,
   StockAdjustmentPayload,
   StockCount,
   StockCountItemUpdatePayload,
   StockCountPayload,
+  StockCountScanPayload,
   StockMovement,
   StockTransfer,
   StockTransferPayload,
@@ -995,6 +997,66 @@ export function updateStockCountItem(
     {
       token,
       method: "PATCH",
+      body,
+    },
+  );
+}
+
+export function scanStockCountItem(
+  token: string,
+  countId: string,
+  itemId: string,
+  body: StockCountScanPayload,
+) {
+  return apiRequest<StockCount>(
+    `/inventory/stock-counts/${countId}/items/${itemId}/scans`,
+    {
+      token,
+      method: "POST",
+      body,
+    },
+  );
+}
+
+export function removeStockCountScan(
+  token: string,
+  countId: string,
+  itemId: string,
+  scanId: string,
+) {
+  return apiRequest<StockCount>(
+    `/inventory/stock-counts/${countId}/items/${itemId}/scans/${scanId}`,
+    {
+      token,
+      method: "DELETE",
+    },
+  );
+}
+
+export function confirmStockCountItem(
+  token: string,
+  countId: string,
+  itemId: string,
+) {
+  return apiRequest<StockCount>(
+    `/inventory/stock-counts/${countId}/items/${itemId}/confirm`,
+    {
+      token,
+      method: "POST",
+    },
+  );
+}
+
+export function resolveSerializedUnitReview(
+  token: string,
+  unitId: string,
+  body: SerializedUnitReviewDecisionPayload,
+) {
+  return apiRequest<SerializedUnit>(
+    `/inventory/serialized-units/${unitId}/review-decision`,
+    {
+      token,
+      method: "POST",
       body,
     },
   );

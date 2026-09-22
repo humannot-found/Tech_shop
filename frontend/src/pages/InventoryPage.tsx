@@ -5,6 +5,7 @@ import {
   approveStockTransfer,
   cancelStockCount,
   cancelStockTransfer,
+  confirmStockCountItem,
   createStockCount,
   createStockTransfer,
   decideAdjustmentRequest,
@@ -17,7 +18,10 @@ import {
   listStockMovements,
   listStockTransfers,
   receiveStockTransfer,
+  removeStockCountScan,
   requestStockAdjustment,
+  resolveSerializedUnitReview,
+  scanStockCountItem,
   submitStockCount,
   updateStockCountItem,
 } from "../api/client";
@@ -79,7 +83,9 @@ type SerializedStatusFilter =
   | "sold"
   | "returned"
   | "damaged"
-  | "quarantined";
+  | "quarantined"
+  | "under_review"
+  | "lost";
 type MovementScope = "selected" | "all";
 
 const serializedStatusOptions: Array<{
@@ -94,6 +100,8 @@ const serializedStatusOptions: Array<{
   { value: "returned", label: "Returned" },
   { value: "damaged", label: "Damaged" },
   { value: "quarantined", label: "Quarantined" },
+  { value: "under_review", label: "Under review (missing)" },
+  { value: "lost", label: "Lost" },
 ];
 
 function updateTransferStatus(
@@ -147,6 +155,13 @@ export function InventoryPage() {
         user.permissions.includes("*") ||
         user.permissions.includes("inventory.adjust")),
   );
+  // Matches the backend: only an Admin or Branch Manager can resolve a unit a
+  // stock count could not find, not everyone with inventory.adjust.
+  const canResolveUnitReview = Boolean(
+    user && ["admin", "owner", "branch_manager"].includes(user.role_code.toLowerCase()),
+  );
+  const [unitReviewBusy, setUnitReviewBusy] = useState(false);
+  const [scanIdentifier, setScanIdentifier] = useState("");
   const [query, setQuery] = useState("");
   const [balanceFilter, setBalanceFilter] = useState<BalanceFilter>("all");
   const [serializedStatus, setSerializedStatus] =
@@ -216,6 +231,15 @@ export function InventoryPage() {
   const selectedCount = useMemo(
     () => stockCounts.find((count) => count.id === selectedCountId) ?? stockCounts[0],
     [selectedCountId, stockCounts],
+  );
+
+  const selectedCountItemRow = useMemo(
+    () => selectedCount?.items.find((item) => item.id === countItemForm.item_id),
+    [selectedCount, countItemForm.item_id],
+  );
+  const selectedCountItemIsSerialized = Boolean(
+    selectedCountItemRow?.tracking_type &&
+      selectedCountItemRow.tracking_type !== "bulk",
   );
 
   const branchOptions = useMemo(
@@ -946,6 +970,97 @@ export function InventoryPage() {
     }
   }
 
+  async function handleScanCountItem(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedCount) {
+      setNotice("Select a physical count first.");
+      return;
+    }
+    const item = selectedCount.items.find((entry) => entry.id === countItemForm.item_id);
+    if (!item) {
+      setNotice("Select an item line first.");
+      return;
+    }
+    const identifier = scanIdentifier.trim();
+    if (identifier.length < 3) {
+      setNotice("Enter or scan an IMEI/serial number.");
+      return;
+    }
+    if (!token || isPreview) {
+      setNotice("Preview mode cannot scan IMEI/serial devices. Sign in to count real stock.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const count = await scanStockCountItem(token, selectedCount.id, item.id, {
+        identifier,
+      });
+      updateCount(count);
+      setScanIdentifier("");
+      setNotice(`${identifier} recorded as found.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not record that scan.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRemoveScan(itemId: string, scanId: string) {
+    if (!selectedCount || !token || isPreview) return;
+    setBusy(true);
+    try {
+      const count = await removeStockCountScan(token, selectedCount.id, itemId, scanId);
+      updateCount(count);
+      setNotice("Scan removed.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not remove that scan.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleConfirmSerializedItem(itemId: string) {
+    if (!selectedCount) return;
+    if (!token || isPreview) {
+      setNotice("Preview mode cannot confirm IMEI/serial counts. Sign in to count real stock.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const count = await confirmStockCountItem(token, selectedCount.id, itemId);
+      updateCount(count);
+      setNotice("Item confirmed as counted.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not confirm this item.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleResolveUnitReview(unit: SerializedUnit, decision: "found" | "lost") {
+    if (!token || isPreview) {
+      setNotice("Preview mode cannot resolve a flagged device.");
+      return;
+    }
+    setUnitReviewBusy(true);
+    try {
+      const updated = await resolveSerializedUnitReview(token, unit.id, { decision });
+      setSerializedUnits((current) =>
+        current.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      setNotice(
+        decision === "found"
+          ? `${unit.imei ?? unit.serial_number} put back into stock.`
+          : `${unit.imei ?? unit.serial_number} written off as lost.`,
+      );
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not resolve this device.");
+    } finally {
+      setUnitReviewBusy(false);
+    }
+  }
+
   async function handleCountAction(action: "submit" | "approve" | "cancel") {
     if (!selectedCount) {
       setNotice("Select a physical count first.");
@@ -1220,6 +1335,31 @@ export function InventoryPage() {
                       {unit.imei ? `IMEI ${unit.imei}` : titleize(unit.condition)}
                     </small>
                   </div>
+                  {unit.status === "under_review" && canResolveUnitReview && (
+                    <div className="table-actions">
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        disabled={unitReviewBusy}
+                        onClick={() => void handleResolveUnitReview(unit, "found")}
+                      >
+                        Found
+                      </button>
+                      <button
+                        type="button"
+                        className="danger-button"
+                        disabled={unitReviewBusy}
+                        onClick={() => void handleResolveUnitReview(unit, "lost")}
+                      >
+                        Mark Lost
+                      </button>
+                    </div>
+                  )}
+                  {unit.status === "under_review" && !canResolveUnitReview && (
+                    <small className="empty-panel-message">
+                      Waiting for a manager to resolve as found or lost.
+                    </small>
+                  )}
                 </article>
               ))
             ) : (
@@ -1540,7 +1680,7 @@ export function InventoryPage() {
                   </div>
                 </div>
 
-                <form className="action-form" onSubmit={handleUpdateCountItem}>
+                <div className="action-form">
                   <label>
                     Item / SKU being counted
                     <select
@@ -1560,42 +1700,139 @@ export function InventoryPage() {
                         <option key={item.id} value={item.id}>
                           {variantLabel(item.variant_id)} · system shows{" "}
                           {integer(item.expected_quantity)}
+                          {item.tracking_type && item.tracking_type !== "bulk"
+                            ? " · scanned"
+                            : ""}
                         </option>
                       ))}
                     </select>
                   </label>
-                  <div className="form-grid form-grid--two">
-                    <label>
-                      Quantity physically counted
-                      <input
-                        type="number"
-                        min="0"
-                        value={countItemForm.counted_quantity}
-                        onChange={(event) =>
-                          setCountItemForm((current) => ({
-                            ...current,
-                            counted_quantity: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                    <label>
-                      Counting note
-                      <input
-                        value={countItemForm.notes}
-                        onChange={(event) =>
-                          setCountItemForm((current) => ({
-                            ...current,
-                            notes: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
+                </div>
+
+                {selectedCountItemIsSerialized && selectedCountItemRow ? (
+                  <div className="action-form">
+                    <strong>IMEI/serial devices are counted by scanning</strong>
+                    <span>
+                      Scan or type each device found, one at a time. Anything the
+                      system still expects but nobody scans is flagged for a
+                      manager to resolve as found or lost when the count is
+                      approved — it is never written off automatically.
+                    </span>
+                    <form
+                      className="form-grid form-grid--two"
+                      onSubmit={handleScanCountItem}
+                    >
+                      <label>
+                        IMEI / serial number
+                        <input
+                          autoFocus
+                          value={scanIdentifier}
+                          onChange={(event) => setScanIdentifier(event.target.value)}
+                          placeholder="Scan or type, then press Enter"
+                        />
+                      </label>
+                      <button className="secondary-button" disabled={busy}>
+                        Record Scan
+                      </button>
+                    </form>
+
+                    <div className="inventory-count-summary">
+                      <div>
+                        <span>System shows</span>
+                        <strong>{integer(selectedCountItemRow.expected_quantity)}</strong>
+                      </div>
+                      <div>
+                        <span>Scanned so far</span>
+                        <strong>
+                          {integer(selectedCountItemRow.counted_quantity ?? 0)}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Variance</span>
+                        <strong>
+                          {signedQuantity(selectedCountItemRow.variance ?? 0)}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="serialized-unit-list">
+                      {(selectedCountItemRow.scans ?? []).length === 0 && (
+                        <p className="empty-panel-message">
+                          Nothing scanned yet. If none of these are on the shelf,
+                          use Confirm Count below to record zero found.
+                        </p>
+                      )}
+                      {(selectedCountItemRow.scans ?? []).map((scan) => (
+                        <article key={scan.id}>
+                          <strong>{scan.unit_identifier}</strong>
+                          <div className="table-actions">
+                            <button
+                              type="button"
+                              className="danger-button"
+                              disabled={busy || selectedCount.status !== "draft"}
+                              onClick={() =>
+                                void handleRemoveScan(selectedCountItemRow.id, scan.id)
+                              }
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+
+                    {Boolean(selectedCountItemRow.unexpected_scan_count) && (
+                      <p className="empty-panel-message">
+                        {selectedCountItemRow.unexpected_scan_count} scanned unit(s)
+                        no longer match what the system expects (e.g. already sold
+                        or transferred). Flagged for review; nothing was changed.
+                      </p>
+                    )}
+
+                    <button
+                      type="button"
+                      className="primary-button"
+                      disabled={busy || selectedCount.status !== "draft"}
+                      onClick={() => void handleConfirmSerializedItem(selectedCountItemRow.id)}
+                    >
+                      Confirm Count For This Item
+                    </button>
                   </div>
-                  <button className="secondary-button" disabled={busy}>
-                    Save Counted Quantity
-                  </button>
-                </form>
+                ) : (
+                  <form className="action-form" onSubmit={handleUpdateCountItem}>
+                    <div className="form-grid form-grid--two">
+                      <label>
+                        Quantity physically counted
+                        <input
+                          type="number"
+                          min="0"
+                          value={countItemForm.counted_quantity}
+                          onChange={(event) =>
+                            setCountItemForm((current) => ({
+                              ...current,
+                              counted_quantity: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <label>
+                        Counting note
+                        <input
+                          value={countItemForm.notes}
+                          onChange={(event) =>
+                            setCountItemForm((current) => ({
+                              ...current,
+                              notes: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                    <button className="secondary-button" disabled={busy}>
+                      Save Counted Quantity
+                    </button>
+                  </form>
+                )}
 
                 <div className="action-form">
                   <label>Count approval</label>

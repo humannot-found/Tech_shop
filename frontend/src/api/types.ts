@@ -799,6 +799,27 @@ export type StockTransferPayload = {
   }>;
 };
 
+export type StockCountScan = ModelResponse & {
+  stock_count_item_id: UUID;
+  serialized_unit_id: UUID;
+  unit_identifier: string;
+  scanned_by_id: UUID;
+};
+
+export type StockCountItem = ModelResponse & {
+  stock_count_id: UUID;
+  variant_id: UUID;
+  expected_quantity: number;
+  counted_quantity: number | null;
+  variance: number | null;
+  notes: string | null;
+  // Present from the API; optional here so existing preview/demo data still
+  // satisfies this type without every fixture being updated.
+  tracking_type?: "bulk" | "serial" | "imei";
+  scans?: StockCountScan[];
+  unexpected_scan_count?: number;
+};
+
 export type StockCount = ModelResponse & {
   branch_id: UUID;
   count_number: string;
@@ -808,16 +829,7 @@ export type StockCount = ModelResponse & {
   submitted_at: string | null;
   approved_at: string | null;
   notes: string | null;
-  items: Array<
-    ModelResponse & {
-      stock_count_id: UUID;
-      variant_id: UUID;
-      expected_quantity: number;
-      counted_quantity: number | null;
-      variance: number | null;
-      notes: string | null;
-    }
-  >;
+  items: StockCountItem[];
 };
 
 export type StockCountPayload = {
@@ -828,6 +840,15 @@ export type StockCountPayload = {
 
 export type StockCountItemUpdatePayload = {
   counted_quantity: number;
+  notes?: string | null;
+};
+
+export type StockCountScanPayload = {
+  identifier: string;
+};
+
+export type SerializedUnitReviewDecisionPayload = {
+  decision: "found" | "lost";
   notes?: string | null;
 };
 
