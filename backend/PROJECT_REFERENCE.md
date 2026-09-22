@@ -371,8 +371,8 @@ matching `backend/schemas/*_schemas.py` file or in Swagger.
 | GET | `/catalog/products/{product_id}` | `product_id` path | - | Gets one product |
 | PATCH | `/catalog/products/{product_id}` | `product_id` path | `ProductUpdate` | Updates product metadata |
 | PATCH | `/catalog/products/{product_id}/publication` | `product_id` path | `ProductPublicationUpdate` | Publishes/unpublishes product |
-| POST | `/catalog/products/{product_id}/variants` | `product_id` path | `ProductVariantCreate` | Adds a variant |
-| PATCH | `/catalog/variants/{variant_id}` | `variant_id` path | `ProductVariantUpdate` | Updates a variant |
+| POST | `/catalog/products/{product_id}/variants` | `product_id` path | `ProductVariantCreate` | Adds a variant; `selling_price` below `cost_price` is rejected; an omitted `minimum_selling_price` defaults to cost + 5% (capped at the selling price) |
+| PATCH | `/catalog/variants/{variant_id}` | `variant_id` path | `ProductVariantUpdate` | Updates a variant; the effective selling price (new or existing) can't go below the effective cost price, and `minimum_selling_price` can be raised/lowered but never cleared to null |
 | POST | `/catalog/products/{product_id}/images` | `product_id` path | `ProductImageCreate` | Adds product image |
 | PATCH | `/catalog/images/{image_id}` | `image_id` path | `ProductImageUpdate` | Updates image |
 | DELETE | `/catalog/images/{image_id}` | `image_id` path | - | Deletes image |

@@ -1796,7 +1796,7 @@ export function CatalogPage() {
                         minimum_selling_price: event.target.value,
                       }))
                     }
-                    placeholder="Optional"
+                    placeholder="Optional: defaults to cost + 5%"
                   />
                 </label>
                 <label>

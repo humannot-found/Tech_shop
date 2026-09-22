@@ -76,6 +76,8 @@ class ProductVariantCreate(BaseSchema):
 
     @model_validator(mode="after")
     def validate_prices(self) -> "ProductVariantCreate":
+        if self.selling_price < self.cost_price:
+            raise ValueError("selling_price cannot be below cost_price")
         if (
             self.minimum_selling_price is not None
             and self.minimum_selling_price > self.selling_price
@@ -126,11 +128,24 @@ class ProductVariantUpdate(BaseSchema):
     @model_validator(mode="after")
     def validate_prices(self) -> "ProductVariantUpdate":
         if (
+            "minimum_selling_price" in self.model_fields_set
+            and self.minimum_selling_price is None
+        ):
+            raise ValueError(
+                "minimum_selling_price cannot be removed; set a value instead"
+            )
+        if (
             self.minimum_selling_price is not None
             and self.selling_price is not None
             and self.minimum_selling_price > self.selling_price
         ):
             raise ValueError("minimum_selling_price cannot exceed selling_price")
+        if (
+            self.cost_price is not None
+            and self.selling_price is not None
+            and self.selling_price < self.cost_price
+        ):
+            raise ValueError("selling_price cannot be below cost_price")
         for field in {
             "name",
             "attributes",

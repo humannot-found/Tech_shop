@@ -1,5 +1,5 @@
 from collections import defaultdict
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from uuid import UUID
 
@@ -31,6 +31,19 @@ from backend.services.exceptions import ConflictError, NotFoundError, Validation
 
 def _money(value: Decimal | None) -> str | None:
     return str(value) if value is not None else None
+
+
+CENT = Decimal("0.01")
+DEFAULT_MINIMUM_MARGIN = Decimal("1.05")  # 5% over cost, when no floor is given
+
+
+def _quantize(value: Decimal) -> Decimal:
+    return value.quantize(CENT, rounding=ROUND_HALF_UP)
+
+
+def _default_minimum_selling_price(cost_price: Decimal, selling_price: Decimal) -> Decimal:
+    """Cost plus 5%, capped at the selling price for a thin-margin item."""
+    return min(selling_price, _quantize(cost_price * DEFAULT_MINIMUM_MARGIN))
 
 
 def category_snapshot(category: Category) -> dict[str, Any]:
@@ -354,6 +367,13 @@ def _ensure_unique_variant(
 
 
 def _new_variant(product_id: UUID, payload: ProductVariantCreate) -> ProductVariant:
+    minimum_selling_price = payload.minimum_selling_price
+    if minimum_selling_price is None:
+        # No floor given: default to cost + 5% so a POS discount can't be taken
+        # all the way down to (or below) cost by accident.
+        minimum_selling_price = _default_minimum_selling_price(
+            payload.cost_price, payload.selling_price
+        )
     return ProductVariant(
         product_id=product_id,
         name=payload.name.strip(),
@@ -363,7 +383,7 @@ def _new_variant(product_id: UUID, payload: ProductVariantCreate) -> ProductVari
         attributes=payload.attributes,
         cost_price=payload.cost_price,
         selling_price=payload.selling_price,
-        minimum_selling_price=payload.minimum_selling_price,
+        minimum_selling_price=minimum_selling_price,
         is_active=True,
     )
 
@@ -592,6 +612,11 @@ def update_variant(
         raise NotFoundError("product variant not found")
     if payload.barcode:
         _ensure_unique_variant(db, variant.sku, payload.barcode, variant.id)
+    effective_cost = (
+        payload.cost_price
+        if "cost_price" in payload.model_fields_set
+        else variant.cost_price
+    )
     effective_selling = (
         payload.selling_price
         if "selling_price" in payload.model_fields_set
@@ -602,6 +627,8 @@ def update_variant(
         if "minimum_selling_price" in payload.model_fields_set
         else variant.minimum_selling_price
     )
+    if effective_selling < effective_cost:
+        raise ValidationError("selling price cannot be below cost price")
     if effective_minimum is not None and effective_minimum > effective_selling:
         raise ValidationError("minimum selling price cannot exceed selling price")
 

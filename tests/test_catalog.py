@@ -1,15 +1,31 @@
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError as PydanticValidationError
 
 from backend.api.dependencies import get_current_principal
 from backend.core.permissions import ADMIN, BRANCH_MANAGER, CASHIER
 from backend.main import app
 from backend.models.database import get_db
+from backend.models.enums import TrackingType
+from backend.schemas.products_schemas import ProductVariantCreate, ProductVariantUpdate
 from backend.services import catalog as catalog_service
 from backend.services.auth import AuthPrincipal
 from backend.services.catalog_import import build_import_plan
+
+
+def variant_payload(**overrides) -> dict:
+    payload = {
+        "name": "Base",
+        "sku": "TEST-SKU-1",
+        "tracking_type": TrackingType.BULK,
+        "cost_price": Decimal("100.00"),
+        "selling_price": Decimal("150.00"),
+    }
+    payload.update(overrides)
+    return payload
 
 VALID_CSV = b"""product_name,product_slug,variant_name,sku,cost_price,selling_price,tracking_type,attributes_json
 ThinkPad T14,thinkpad-t14,16GB RAM,LEN-T14-16,100000,125000,serial,"{""ram"":""16GB""}"
@@ -111,6 +127,52 @@ def test_cashier_with_catalog_view_can_search_catalog(monkeypatch) -> None:
     response = TestClient(app).get("/api/v1/staff/catalog/products?q=laptop")
     assert response.status_code == 200
     assert response.json()["total"] == 0
+
+
+def test_variant_create_rejects_selling_price_below_cost() -> None:
+    with pytest.raises(PydanticValidationError):
+        ProductVariantCreate(
+            **variant_payload(cost_price=Decimal("200.00"), selling_price=Decimal("150.00"))
+        )
+
+
+def test_variant_create_allows_selling_price_at_cost() -> None:
+    variant = ProductVariantCreate(
+        **variant_payload(cost_price=Decimal("150.00"), selling_price=Decimal("150.00"))
+    )
+    assert variant.selling_price == variant.cost_price
+
+
+def test_default_minimum_selling_price_is_cost_plus_five_percent() -> None:
+    assert catalog_service._default_minimum_selling_price(
+        Decimal("100.00"), Decimal("200.00")
+    ) == Decimal("105.00")
+
+
+def test_default_minimum_selling_price_is_capped_at_selling_price() -> None:
+    # Only a 2% margin over cost: the 5%-over-cost default would exceed the
+    # selling price, so it is capped there instead.
+    assert catalog_service._default_minimum_selling_price(
+        Decimal("100.00"), Decimal("102.00")
+    ) == Decimal("102.00")
+
+
+def test_variant_update_cannot_remove_minimum_selling_price() -> None:
+    with pytest.raises(PydanticValidationError):
+        ProductVariantUpdate(minimum_selling_price=None)
+
+
+def test_variant_update_rejects_selling_price_below_cost_when_both_given() -> None:
+    with pytest.raises(PydanticValidationError):
+        ProductVariantUpdate(
+            cost_price=Decimal("200.00"), selling_price=Decimal("150.00")
+        )
+
+
+def test_variant_update_allows_partial_price_changes() -> None:
+    update = ProductVariantUpdate(selling_price=Decimal("160.00"))
+    assert update.cost_price is None
+    assert "minimum_selling_price" not in update.model_fields_set
 
 
 def test_admin_can_validate_csv_upload() -> None:
