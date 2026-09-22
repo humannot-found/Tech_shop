@@ -10,6 +10,7 @@ import type {
   CatalogProduct,
   Category,
   CategoryCreatePayload,
+  CategoryUpdatePayload,
   CurrentUser,
   Customer,
   CustomerCreatePayload,
@@ -223,6 +224,18 @@ export function createCategory(token: string, body: CategoryCreatePayload) {
   return apiRequest<Category>("/catalog/categories", {
     token,
     method: "POST",
+    body,
+  });
+}
+
+export function updateCategory(
+  token: string,
+  categoryId: string,
+  body: CategoryUpdatePayload,
+) {
+  return apiRequest<Category>(`/catalog/categories/${categoryId}`, {
+    token,
+    method: "PATCH",
     body,
   });
 }

@@ -33,6 +33,8 @@ export const demoCategories: Category[] = [
     slug: "phones",
     description: "Smartphones and feature phones",
     is_active: true,
+    default_warranty_months: 6,
+    default_tracking_type: "imei",
   },
   {
     id: "demo-category-laptops",
@@ -44,6 +46,8 @@ export const demoCategories: Category[] = [
     slug: "laptops",
     description: "New and ex-UK laptops",
     is_active: true,
+    default_warranty_months: 12,
+    default_tracking_type: "serial",
   },
   {
     id: "demo-category-accessories",
@@ -55,6 +59,8 @@ export const demoCategories: Category[] = [
     slug: "accessories",
     description: "Chargers, cables, flash disks, memory cards, and power banks",
     is_active: true,
+    default_warranty_months: 0,
+    default_tracking_type: "bulk",
   },
   {
     id: "demo-category-repair-parts",
@@ -66,6 +72,8 @@ export const demoCategories: Category[] = [
     slug: "repair-parts",
     description: "Parts consumed by repair tickets",
     is_active: true,
+    default_warranty_months: 0,
+    default_tracking_type: "bulk",
   },
 ];
 

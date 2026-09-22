@@ -11,6 +11,7 @@ import {
   listCategories,
   setProductPublication,
   updateCatalogProduct,
+  updateCategory,
   updateProductVariant,
 } from "../api/client";
 import type { Brand, CatalogProduct, Category, CatalogVariant } from "../api/types";
@@ -74,6 +75,8 @@ const emptyCategoryForm = {
   name: "",
   slug: "",
   description: "",
+  default_warranty_months: "",
+  default_tracking_type: "" as TrackingType | "",
 };
 
 const emptyBrandForm = {
@@ -231,6 +234,27 @@ function defaultWarranty(kind: ItemKind) {
   if (kind === "laptop") return "6";
   if (kind === "accessory") return "3";
   return "0";
+}
+
+/**
+ * A category's own stored tracking-type suggestion, when one has been set,
+ * otherwise the generic guess from its name.
+ */
+function categoryTrackingDefault(category: Category | undefined, kind: ItemKind): TrackingType {
+  return category?.default_tracking_type ?? defaultTracking(kind);
+}
+
+/**
+ * A category's own stored warranty default, when it has been deliberately
+ * set above zero, otherwise the generic guess from its name. A category left
+ * at zero (the default for a category nobody has configured yet) still
+ * falls back to the guess, so newly created categories behave as before.
+ */
+function categoryWarrantyDefault(category: Category | undefined, kind: ItemKind) {
+  if (category && category.default_warranty_months > 0) {
+    return String(category.default_warranty_months);
+  }
+  return defaultWarranty(kind);
 }
 
 function kindLabel(kind: ItemKind) {
@@ -477,6 +501,11 @@ export function CatalogPage() {
     demoCatalogProducts[0]?.variants[0]?.id ?? "",
   );
   const [categoryForm, setCategoryForm] = useState(emptyCategoryForm);
+  const [categoryDefaultsForm, setCategoryDefaultsForm] = useState({
+    category_id: "",
+    default_warranty_months: "0",
+    default_tracking_type: "" as TrackingType | "",
+  });
   const [brandForm, setBrandForm] = useState(emptyBrandForm);
   const [itemForm, setItemForm] = useState<ItemForm>(baseItemForm);
   const [productEditForm, setProductEditForm] = useState(emptyProductEditForm);
@@ -727,8 +756,8 @@ export function CatalogPage() {
     setItemForm((current) => ({
       ...current,
       category_id: categoryId,
-      tracking_type: defaultTracking(kind),
-      warranty_months: defaultWarranty(kind),
+      tracking_type: categoryTrackingDefault(category, kind),
+      warranty_months: categoryWarrantyDefault(category, kind),
     }));
   }
 
@@ -752,6 +781,8 @@ export function CatalogPage() {
           slug: categoryForm.slug.trim(),
           description: categoryForm.description || null,
           is_active: true,
+          default_warranty_months: Number(categoryForm.default_warranty_months) || 0,
+          default_tracking_type: categoryForm.default_tracking_type || null,
         };
         setCategories((current) => [category, ...current]);
         setItemForm((current) => ({ ...current, category_id: category.id }));
@@ -764,6 +795,8 @@ export function CatalogPage() {
         name: categoryForm.name.trim(),
         slug: categoryForm.slug.trim(),
         description: categoryForm.description || null,
+        default_warranty_months: Number(categoryForm.default_warranty_months) || 0,
+        default_tracking_type: categoryForm.default_tracking_type || null,
       });
       setCategories((current) => [category, ...current]);
       setItemForm((current) => ({ ...current, category_id: category.id }));
@@ -771,6 +804,67 @@ export function CatalogPage() {
       setNotice(`Created category ${category.name}.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not create category.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleSelectCategoryDefaults(categoryId: string) {
+    const category = categories.find((item) => item.id === categoryId);
+    setCategoryDefaultsForm({
+      category_id: categoryId,
+      default_warranty_months: String(category?.default_warranty_months ?? 0),
+      default_tracking_type: category?.default_tracking_type ?? "",
+    });
+  }
+
+  async function handleUpdateCategoryDefaults(event: FormEvent) {
+    event.preventDefault();
+    const category = categories.find(
+      (item) => item.id === categoryDefaultsForm.category_id,
+    );
+    if (!category) {
+      setNotice("Select a category to update its defaults.");
+      return;
+    }
+    const warrantyMonths = Number(categoryDefaultsForm.default_warranty_months);
+    if (Number.isNaN(warrantyMonths) || warrantyMonths < 0) {
+      setNotice("Default warranty must be zero or more months.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      if (!token || isPreview) {
+        setCategories((current) =>
+          current.map((item) =>
+            item.id === category.id
+              ? {
+                  ...item,
+                  default_warranty_months: warrantyMonths,
+                  default_tracking_type:
+                    categoryDefaultsForm.default_tracking_type || null,
+                  updated_at: new Date().toISOString(),
+                }
+              : item,
+          ),
+        );
+        setNotice("Preview category defaults updated locally.");
+        return;
+      }
+
+      const updated = await updateCategory(token, category.id, {
+        default_warranty_months: warrantyMonths,
+        default_tracking_type: categoryDefaultsForm.default_tracking_type || null,
+      });
+      setCategories((current) =>
+        current.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      setNotice(`Updated defaults for ${updated.name}.`);
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Could not update category defaults.",
+      );
     } finally {
       setBusy(false);
     }
@@ -938,8 +1032,8 @@ export function CatalogPage() {
           ...baseItemForm(),
           category_id: current.category_id,
           brand_id: current.brand_id,
-          tracking_type: defaultTracking(selectedKind),
-          warranty_months: defaultWarranty(selectedKind),
+          tracking_type: categoryTrackingDefault(selectedCategory, selectedKind),
+          warranty_months: categoryWarrantyDefault(selectedCategory, selectedKind),
         }));
         setNotice("Preview item created locally. Next step: receive stock before selling it in POS.");
         return;
@@ -977,8 +1071,8 @@ export function CatalogPage() {
         ...baseItemForm(),
         category_id: current.category_id,
         brand_id: current.brand_id,
-        tracking_type: defaultTracking(selectedKind),
-        warranty_months: defaultWarranty(selectedKind),
+        tracking_type: categoryTrackingDefault(selectedCategory, selectedKind),
+        warranty_months: categoryWarrantyDefault(selectedCategory, selectedKind),
       }));
       setNotice(`Created item ${product.name}. Next step: receive stock before selling it in POS.`);
     } catch (error) {
@@ -2438,10 +2532,108 @@ export function CatalogPage() {
                     }
                   />
                 </label>
+                <label>
+                  Default warranty (months)
+                  <input
+                    type="number"
+                    min="0"
+                    value={categoryForm.default_warranty_months}
+                    onChange={(event) =>
+                      setCategoryForm((current) => ({
+                        ...current,
+                        default_warranty_months: event.target.value,
+                      }))
+                    }
+                    placeholder="Optional"
+                  />
+                </label>
+                <label>
+                  Default stock tracking
+                  <select
+                    value={categoryForm.default_tracking_type}
+                    onChange={(event) =>
+                      setCategoryForm((current) => ({
+                        ...current,
+                        default_tracking_type: event.target.value as TrackingType | "",
+                      }))
+                    }
+                  >
+                    <option value="">No suggestion (guess from name)</option>
+                    <option value="bulk">Quantity only</option>
+                    <option value="serial">Serial number</option>
+                    <option value="imei">IMEI</option>
+                  </select>
+                </label>
               </div>
+              <span className="muted">
+                New items in this category prefill from these; either can still be
+                changed per item.
+              </span>
               <div className="form-footer">
                 <button className="secondary-button" disabled={busy}>
                   Add Category
+                </button>
+              </div>
+            </form>
+
+            <form
+              className="form-panel form-panel--compact form-panel--bordered"
+              onSubmit={handleUpdateCategoryDefaults}
+            >
+              <strong>Category defaults</strong>
+              <div className="form-grid form-grid--two">
+                <label>
+                  Category
+                  <select
+                    value={categoryDefaultsForm.category_id}
+                    onChange={(event) => handleSelectCategoryDefaults(event.target.value)}
+                  >
+                    <option value="">Select category</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Default warranty (months)
+                  <input
+                    type="number"
+                    min="0"
+                    value={categoryDefaultsForm.default_warranty_months}
+                    onChange={(event) =>
+                      setCategoryDefaultsForm((current) => ({
+                        ...current,
+                        default_warranty_months: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  Default stock tracking
+                  <select
+                    value={categoryDefaultsForm.default_tracking_type}
+                    onChange={(event) =>
+                      setCategoryDefaultsForm((current) => ({
+                        ...current,
+                        default_tracking_type: event.target.value as TrackingType | "",
+                      }))
+                    }
+                  >
+                    <option value="">No suggestion (guess from name)</option>
+                    <option value="bulk">Quantity only</option>
+                    <option value="serial">Serial number</option>
+                    <option value="imei">IMEI</option>
+                  </select>
+                </label>
+              </div>
+              <div className="form-footer">
+                <button
+                  className="secondary-button"
+                  disabled={busy || !categoryDefaultsForm.category_id}
+                >
+                  Save Defaults
                 </button>
               </div>
             </form>

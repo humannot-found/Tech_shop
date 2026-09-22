@@ -84,6 +84,9 @@ export type Category = ModelResponse & {
   slug: string;
   description: string | null;
   is_active: boolean;
+  // Prefills the new-item form for a product in this category.
+  default_warranty_months: number;
+  default_tracking_type: "bulk" | "serial" | "imei" | null;
 };
 
 export type Brand = ModelResponse & {
@@ -97,6 +100,17 @@ export type CategoryCreatePayload = {
   name: string;
   slug: string;
   description?: string | null;
+  default_warranty_months?: number;
+  default_tracking_type?: "bulk" | "serial" | "imei" | null;
+};
+
+export type CategoryUpdatePayload = {
+  parent_id?: UUID | null;
+  name?: string;
+  description?: string | null;
+  is_active?: boolean;
+  default_warranty_months?: number;
+  default_tracking_type?: "bulk" | "serial" | "imei" | null;
 };
 
 export type BrandCreatePayload = {
