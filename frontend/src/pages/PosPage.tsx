@@ -202,7 +202,9 @@ export function PosPage({
 
     let active = true;
     Promise.allSettled([
-      listCatalogProducts(token, query || "demo"),
+      // Items go on sale here as soon as stock is receivable, whether or not
+      // they've been published to the public website.
+      listCatalogProducts(token, query || "demo", { isPublished: null }),
       currentTillSession(token),
       user?.branch_id ? listTills(token, user.branch_id) : Promise.resolve([]),
       user?.branch_id
@@ -381,7 +383,7 @@ export function PosPage({
   async function findProductForVariant(variantId: string, sku: string) {
     const loaded = products.find((product) => product.variantId === variantId);
     if (loaded || !token) return loaded ?? null;
-    const page = await listCatalogProducts(token, sku);
+    const page = await listCatalogProducts(token, sku, { isPublished: null });
     return (
       productsFromApi(page.items).find((product) => product.variantId === variantId) ??
       null
@@ -446,7 +448,7 @@ export function PosPage({
         return;
       }
 
-      const catalogPage = await listCatalogProducts(token, code);
+      const catalogPage = await listCatalogProducts(token, code, { isPublished: null });
       const match = productsFromApi(catalogPage.items).find(
         (product) =>
           product.barcode === code || product.sku.toLowerCase() === lowered,
